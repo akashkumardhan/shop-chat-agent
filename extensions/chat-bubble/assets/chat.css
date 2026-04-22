@@ -244,6 +244,31 @@
     font-weight: 600;
   }
 
+  .shop-ai-message.assistant .shop-ai-heading {
+    display: block;
+    font-weight: 700;
+    font-size: 0.95em;
+    margin: 8px 0 4px 0;
+    color: #1a1a1a;
+  }
+
+  .shop-ai-message.assistant .shop-ai-heading-main {
+    font-size: 1.05em;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+  }
+
+  .shop-ai-inline-image {
+    display: block;
+    max-width: 140px;
+    max-height: 140px;
+    border-radius: 8px;
+    margin: 6px 0;
+    object-fit: cover;
+    border: 1px solid #e5e5e5;
+  }
+
   .shop-ai-message.user {
     align-self: flex-end;
     background-color: #5046e4;

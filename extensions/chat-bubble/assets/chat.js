@@ -368,6 +368,12 @@
         // Process the text with various Markdown features
         let processedText = rawText;
 
+        // Process Markdown images before links (![alt](url) → <img>)
+        const markdownImageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+        processedText = processedText.replace(markdownImageRegex, (match, alt, url) => {
+          return '<img src="' + url + '" alt="' + alt + '" class="shop-ai-inline-image" onerror="this.style.display=\'none\'">';
+        });
+
         // Process Markdown links
         const markdownLinkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
         processedText = processedText.replace(markdownLinkRegex, (match, text, url) => {
@@ -410,10 +416,28 @@
 
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
+          const h3Match = line.match(/^###\s+(.*)/);
+          const h2Match = line.match(/^##\s+(.*)/);
+          const h1Match = line.match(/^#\s+(.*)/);
           const unorderedMatch = line.match(/^\s*([-*])\s+(.*)/);
           const orderedMatch = line.match(/^\s*(\d+)[\.)]\s+(.*)/);
 
-          if (unorderedMatch) {
+          if (h3Match || h2Match || h1Match) {
+            if (currentList) {
+              htmlContent += currentList === 'ul'
+                ? '<ul>' + listItems.join('') + '</ul>'
+                : `<ol start="${startNumber}">` + listItems.join('') + '</ol>';
+              listItems = [];
+              currentList = null;
+            }
+            if (h3Match) {
+              htmlContent += '<strong class="shop-ai-heading">' + h3Match[1] + '</strong>';
+            } else if (h2Match) {
+              htmlContent += '<strong class="shop-ai-heading">' + h2Match[1] + '</strong>';
+            } else {
+              htmlContent += '<strong class="shop-ai-heading shop-ai-heading-main">' + h1Match[1] + '</strong>';
+            }
+          } else if (unorderedMatch) {
             if (currentList !== 'ul') {
               if (currentList === 'ol') {
                 htmlContent += `<ol start="${startNumber}">` + listItems.join('') + '</ol>';
