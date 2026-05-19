@@ -69,6 +69,36 @@
     <div id="auth-stage" style="width:380px;"></div>
   </div>
 
+  <h2>Sizing widget</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="sizing-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Compare link (opens sheet)</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="compare-stage" style="width:380px;height:120px;position:relative;"></div>
+  </div>
+
+  <h2>Image preview bubble</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="image-stage" style="width:380px;display:flex;flex-direction:column;align-items:flex-end;"></div>
+  </div>
+
+  <h2>Returning-user resume</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="resume-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Error banner</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="error-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Offline bar</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;padding:0;">
+    <div id="offline-stage" style="width:420px;"></div>
+  </div>
+
   <h2>Composer</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
     <div id="composer-stage" style="width:420px;"></div>
@@ -85,6 +115,11 @@
     import { createSaveCartCard } from './modules/ui-save-cart.js';
     import { createOrderStatus } from './modules/ui-order-status.js';
     import { createAuthPrompt } from './modules/ui-auth-prompt.js';
+    import { createSizingWidget } from './modules/ui-sizing-widget.js';
+    import { createCompareLink, openCompareSheet } from './modules/ui-compare-sheet.js';
+    import { createImagePreview } from './modules/ui-image-preview.js';
+    import { createResumeCard } from './modules/ui-resume-card.js';
+    import { createErrorBanner, createOfflineBar } from './modules/ui-error-banner.js';
 
     for (const size of [16, 22, 32, 60, 96]) {
       const o = createOrb({ size });
@@ -159,7 +194,50 @@
       subtitle: "Connect your account — we won't see your password.",
     }, { onSuccess: () => alert('connected') }));
 
-    document.getElementById('composer-stage').appendChild(createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) }).node);
+    document.getElementById('composer-stage').appendChild(createComposer({ onSubmit: (v) => alert(`Sent: ${JSON.stringify(v)}`) }).node);
+
+    document.getElementById('sizing-stage').appendChild(createSizingWidget({
+      title: 'Ring Size Finder',
+      steps: [
+        { id: 'width', label: 'Width', question: "What's the band width you're looking at?", options: [
+          { value: 'slim', label: 'Slim (≤3mm)' }, { value: 'std', label: 'Standard (4–5mm)' }, { value: 'wide', label: 'Wide (6mm+)' }, { value: 'unknown', label: 'Not sure' },
+        ]},
+        { id: 'brand_size', label: 'Brand size', question: "What's your size in another brand?", options: [
+          { value: '5', label: '5' }, { value: '6', label: '6' }, { value: '7', label: '7' }, { value: '8', label: '8' },
+        ]},
+      ],
+      fallback: { label: 'Print a sizer →', url: '#' },
+    }, { onComplete: (a) => alert(JSON.stringify(a)) }).node);
+
+    const compareBlock = {
+      verdict: 'Halo balances daily wear & sparkle; pick Solitaire if budget matters most.',
+      items: [
+        { title: 'Halo', image: 'https://picsum.photos/seed/halo/200/200', attrs: { Price: '$2,499', Metal: '14k', Resize: 'Yes', Setting: 'Halo' } },
+        { title: '3-Stone', image: 'https://picsum.photos/seed/3st/200/200', attrs: { Price: '$3,200', Metal: '18k', Resize: 'Limited', Setting: '3-stone' } },
+        { title: 'Solitaire', image: 'https://picsum.photos/seed/sol/200/200', attrs: { Price: '$1,890', Metal: '14k', Resize: 'Yes', Setting: 'Prong' } },
+      ],
+    };
+    const cstage = document.getElementById('compare-stage');
+    cstage.appendChild(createCompareLink(compareBlock, { onOpen: (b) => openCompareSheet(b, { container: cstage }) }));
+
+    document.getElementById('image-stage').appendChild(createImagePreview({
+      dataUrl: 'https://picsum.photos/seed/imgupload/300/300',
+      alt: 'Uploaded inspiration photo',
+    }));
+
+    document.getElementById('resume-stage').appendChild(createResumeCard({
+      summary: 'You were comparing the Halo and 3-Stone.',
+      ageLabel: '2 days ago',
+      onContinue: () => alert('continue'),
+      onStartFresh: () => alert('fresh'),
+    }));
+
+    document.getElementById('error-stage').appendChild(createErrorBanner({
+      message: 'Connection dropped. Response incomplete.',
+      onRetry: () => alert('retry'),
+    }));
+
+    document.getElementById('offline-stage').appendChild(createOfflineBar());
   </script>
 </body>
 </html>
