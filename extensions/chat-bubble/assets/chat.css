@@ -663,4 +663,79 @@
   filter: brightness(0.95);
 }
 
+/* ============================================================
+ * Welcome panel
+ * ============================================================ */
+.swa-welcome {
+  padding: var(--swa-space-5) var(--swa-space-4) var(--swa-space-3);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--swa-space-2);
+}
+.swa-welcome-orb {
+  margin-bottom: var(--swa-space-1);
+}
+.swa-welcome-greeting {
+  font-size: var(--swa-text-md);
+  font-weight: var(--swa-weight-medium);
+  color: var(--swa-color-text-primary);
+}
+.swa-welcome-context {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+}
+
+.swa-welcome-hero {
+  background: color-mix(in srgb, var(--swa-color-brand) 6%, var(--swa-color-bg));
+  border: 1px solid color-mix(in srgb, var(--swa-color-brand) 35%, var(--swa-color-border));
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+  width: 100%;
+  text-align: left;
+  margin-top: var(--swa-space-3);
+}
+.swa-welcome-hero-title {
+  font-size: var(--swa-text-base);
+  font-weight: var(--swa-weight-semibold);
+  color: var(--swa-color-text-primary);
+}
+.swa-welcome-hero-subtitle {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+  margin: var(--swa-space-1) 0 var(--swa-space-3);
+}
+.swa-welcome-hero-button {
+  width: 100%;
+  background: var(--swa-color-brand);
+  color: var(--swa-color-brand-foreground);
+  border: none;
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-2) var(--swa-space-3);
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+  cursor: pointer;
+}
+.swa-welcome-hero-button:hover { background: var(--swa-color-brand-hover); }
+.swa-welcome-hero-button:focus-visible {
+  outline: 3px solid var(--swa-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.swa-welcome-or {
+  margin-top: var(--swa-space-3);
+  font-size: var(--swa-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--swa-color-text-tertiary);
+}
+.swa-welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--swa-space-2);
+  margin-top: var(--swa-space-2);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
