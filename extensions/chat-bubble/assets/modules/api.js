@@ -38,10 +38,11 @@ export function streamChat(payload, handlers) {
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let streamDone = false;
 
-      while (true) {
+      while (!streamDone) {
         const { value, done } = await reader.read();
-        if (done) break;
+        if (done) { streamDone = true; break; }
         buffer += decoder.decode(value, { stream: true });
 
         let idx;
