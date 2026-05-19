@@ -1530,4 +1530,86 @@
 }
 .swa-new-messages-pill[data-visible="true"] { display: inline-flex; align-items: center; gap: 6px; }
 
+/* ============================================================
+ * Resume card / banners / offline bar
+ * ============================================================ */
+.swa-resume {
+  background: color-mix(in srgb, var(--swa-color-brand) 6%, var(--swa-color-bg));
+  border: 1px solid color-mix(in srgb, var(--swa-color-brand) 30%, var(--swa-color-border));
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+  margin-bottom: var(--swa-space-3);
+}
+.swa-resume-title {
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-semibold);
+}
+.swa-resume-sub {
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-secondary);
+  margin: var(--swa-space-1) 0 var(--swa-space-2);
+}
+.swa-resume-actions { display: flex; gap: var(--swa-space-2); }
+.swa-resume-actions > * { flex: 1; padding: var(--swa-space-2); border-radius: var(--swa-radius-sm); text-align: center; font-size: var(--swa-text-sm); border: none; cursor: pointer; }
+.swa-resume-actions .primary { background: var(--swa-color-brand); color: var(--swa-color-brand-foreground); font-weight: var(--swa-weight-medium); }
+.swa-resume-actions .ghost { background: transparent; color: var(--swa-color-text-primary); border: 1px solid var(--swa-color-border-strong); }
+
+.swa-day-divider {
+  text-align: center;
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-tertiary);
+  padding: var(--swa-space-2) 0;
+}
+.swa-prior-turns { opacity: 0.55; }
+
+.swa-error-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-2) var(--swa-space-3);
+  background: var(--swa-color-warning-bg);
+  color: var(--swa-color-warning-fg);
+  border-radius: var(--swa-radius-md);
+  font-size: var(--swa-text-sm);
+}
+.swa-error-banner button {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  font-weight: var(--swa-weight-medium);
+  cursor: pointer;
+  margin-left: auto;
+}
+
+.swa-offline-bar {
+  background: var(--swa-color-text-primary);
+  color: var(--swa-color-bg);
+  padding: var(--swa-space-1) var(--swa-space-3);
+  font-size: var(--swa-text-xs);
+  text-align: center;
+  flex-shrink: 0;
+}
+.swa-offline-bar .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--swa-color-warning-fg);
+  margin-right: 6px;
+}
+
+.swa-ratelimit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-1) var(--swa-space-3);
+  background: var(--swa-color-bg-subtle);
+  border-radius: var(--swa-radius-full);
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-secondary);
+  margin: var(--swa-space-2) var(--swa-space-4);
+}
+
 /* Subsequent component styles are added in their respective tasks. */

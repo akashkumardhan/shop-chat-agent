@@ -71,6 +71,40 @@ export function streamChat(payload, handlers) {
 }
 
 /**
+ * streamChatWithRetry — wraps streamChat with a single silent retry on
+ * transient errors. The retry is invisible to the caller's onEvent stream,
+ * but onError still fires if the retry also fails.
+ */
+export function streamChatWithRetry(payload, handlers) {
+  let retried = false;
+  let activeCtl = null;
+
+  const proxy = {
+    onEvent: handlers.onEvent || (() => {}),
+    onError: (err) => {
+      if (!retried && isTransient(err)) {
+        retried = true;
+        activeCtl = streamChat(payload, proxy);
+        return;
+      }
+      (handlers.onError || (() => {}))(err);
+    },
+    onClose: handlers.onClose || (() => {}),
+  };
+
+  activeCtl = streamChat(payload, proxy);
+  return { cancel: () => activeCtl && activeCtl.cancel() };
+}
+
+function isTransient(err) {
+  if (!err) return false;
+  if (err.name === 'AbortError') return false;
+  if (err.message && /failed: 5\d\d/.test(err.message)) return true;
+  if (err.message && /failed to fetch|networkerror/i.test(err.message)) return true;
+  return false;
+}
+
+/**
  * fetchWelcome — requests the welcome bundle.
  */
 export async function fetchWelcome({ pageType, pageContext, hasPriorConvo } = {}) {

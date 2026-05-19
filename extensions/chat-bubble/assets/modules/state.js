@@ -40,6 +40,7 @@ export const INITIAL_STATE = {
   hasUnread: false,
   pendingMessagePreview: null,
   isOnline: true,
+  rateLimitedUntil: 0,
   shopName: '',
   brandColor: '#5046E4',
 };
