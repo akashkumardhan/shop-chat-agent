@@ -212,4 +212,67 @@
 /* Hide the temporary stub from Task 5 once ui-launcher takes over */
 .swa-stub-launcher { display: none; }
 
+/* ============================================================
+ * Window
+ * ============================================================ */
+.swa-window {
+  position: absolute;
+  bottom: 80px;
+  right: 0;
+  width: 420px;
+  height: 640px;
+  max-height: calc(var(--swa-viewport-height, 100vh) - 120px);
+  background: var(--swa-color-bg);
+  border-radius: var(--swa-radius-xl);
+  box-shadow: var(--swa-shadow-xl);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition:
+    opacity var(--swa-duration-slow) var(--swa-ease-emphasized),
+    transform var(--swa-duration-slow) var(--swa-ease-emphasized);
+  z-index: var(--swa-z-window);
+  font-size: var(--swa-text-base);
+}
+.shop-ai-chat-container[data-state="open"] .swa-window {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+@media (max-width: 768px) and (min-width: 481px) {
+  .swa-window { width: 380px; height: 600px; }
+}
+
+@media (max-width: 480px) {
+  .shop-ai-chat-container {
+    bottom: 16px;
+    right: 16px;
+  }
+  .swa-window {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    height: var(--swa-viewport-height, 100vh);
+    max-height: none;
+    border-radius: 0;
+    box-shadow: none;
+    transform: translateY(100%);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+  }
+  .shop-ai-chat-container[data-state="open"] .swa-window {
+    transform: translateY(0);
+  }
+  body.swa-locked {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+  }
+}
+
 /* Subsequent component styles are added in their respective tasks. */

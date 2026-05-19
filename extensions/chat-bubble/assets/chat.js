@@ -1,9 +1,7 @@
-/**
- * Shop AI Chat — root entry.
- */
 import { qs } from './modules/dom.js';
 import { createState, INITIAL_STATE } from './modules/state.js';
 import { createLauncher } from './modules/ui-launcher.js';
+import { createWindow } from './modules/ui-window.js';
 
 function init() {
   const root = qs('#shop-ai-chat-root');
@@ -16,17 +14,18 @@ function init() {
     brandColor: config.brandColor || INITIAL_STATE.brandColor,
   });
 
-  // Apply merchant brand color as a CSS variable override on the root.
   if (config.brandColor) {
     root.style.setProperty('--swa-color-brand', config.brandColor);
   }
 
   const launcher = createLauncher({ state });
-  root.appendChild(launcher);
+  const window_ = createWindow({ state, launcher });
 
-  // Open/close state is observed in Task 8 by ui-window. For now, log it.
-  state.subscribe('isOpen', (v) => {
-    root.dataset.state = v ? 'open' : 'closed';
+  root.appendChild(launcher);
+  root.appendChild(window_.node);
+
+  state.subscribe('isOpen', (isOpen) => {
+    root.dataset.state = isOpen ? 'open' : 'closed';
   });
 }
 
