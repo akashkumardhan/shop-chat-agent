@@ -28,8 +28,8 @@ function init() {
     root.style.setProperty('--swa-color-brand', config.brandColor);
   }
 
-  const launcher = createLauncher({ state });
-  const window_ = createWindow({ state, launcher });
+  const launcherCtl = createLauncher({ state });
+  const window_ = createWindow({ state, launcher: launcherCtl.node });
   const header = createHeader({ state });
   const composer = createComposer({
     onSubmit: (value) => console.log('[swa] message submitted:', value),
@@ -43,13 +43,18 @@ function init() {
   window_.composerSlot.appendChild(composer.node);
   window_.footerSlot.appendChild(footer);
 
-  root.appendChild(launcher);
+  root.appendChild(launcherCtl.node);
+  root.appendChild(launcherCtl.previewBubble);
   root.appendChild(window_.node);
 
   state.subscribe('isOpen', (isOpen) => {
     root.dataset.state = isOpen ? 'open' : 'closed';
     if (isOpen) requestAnimationFrame(() => composer.focus());
   });
+
+  // DEV-only — exposes state for manual testing in browser devtools.
+  // Removed in Task 14.
+  if (typeof window !== 'undefined') window.__swaState = state;
 }
 
 if (document.readyState === 'loading') {

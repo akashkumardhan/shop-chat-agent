@@ -471,4 +471,59 @@
   text-decoration: underline;
 }
 
+/* ============================================================
+ * Pending pill (launcher transforms when there's an unread)
+ * ============================================================ */
+.swa-launcher[data-mode="pill"] {
+  width: auto;
+  height: 56px;
+  border-radius: var(--swa-radius-full);
+  padding: 0 var(--swa-space-4) 0 var(--swa-space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  animation: none;
+}
+.swa-launcher[data-mode="pill"] .swa-launcher-label {
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+  color: var(--swa-color-text-primary);
+}
+.swa-launcher-unread-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--swa-color-danger-fg);
+}
+
+.swa-preview-bubble {
+  position: absolute;
+  bottom: 84px;
+  right: 0;
+  max-width: 280px;
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-lg);
+  box-shadow: var(--swa-shadow-md);
+  padding: var(--swa-space-3);
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-primary);
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity var(--swa-duration-base), transform var(--swa-duration-base);
+}
+.swa-preview-bubble[data-visible="true"] {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.swa-preview-source {
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-tertiary);
+  margin-bottom: var(--swa-space-1);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
