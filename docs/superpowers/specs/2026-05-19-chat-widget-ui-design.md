@@ -351,13 +351,13 @@ A turn is an avatar + a vertical stack of one or more blocks.
 | `compare_sheet_link` | Stub linking to full sheet for 3+ (§9.6). |
 | `image_preview` | User-uploaded image in user-side bubble, max 240px, tap-to-lightbox. |
 | `vision_result` | Assistant text describing image + product carousel. |
-| `auth_prompt` | "Sign in to see your orders" inline card with OAuth trigger. |
-| `handoff_card` | §11.4. |
-| `save_cart_card` | "Save this cart and pick up later" — email/SMS capture. |
+| `auth_prompt` | Inline sign-in card; OAuth popup. Full spec §11.7. |
+| `handoff_card` | §12.4. |
+| `save_cart_card` | Email + optional SMS capture to save cart. Full spec §11.6. |
 | `policy_excerpt` | Quote-styled excerpt with cite link. |
-| `cart_summary` | Compact cart with items + subtotal + checkout button. |
-| `order_status` | Order card with status, items, tracking link. |
-| `error_card` | Friendly error + retry action (§11.2). |
+| `cart_summary` | In-widget cart with qty/remove/discount/express + Checkout. Full spec §11.2. |
+| `order_status` | Order card with status pill, items, tracking link, Reorder. Full spec §11.5. |
+| `error_card` | Friendly error + retry action (§12.2). |
 
 ### 9.3 Tool-use indicator
 
@@ -468,7 +468,149 @@ State machine (from initial render):
 
 ---
 
-## 11. Edge states
+## 11. Customer actions inside the widget
+
+The widget is sales-first, which means the customer should be able to complete most of the buying journey *inside* the widget — discover, compare, add to cart, manage cart, sign in, look up orders — without bouncing back and forth between the chat and the storefront. The only required transition out is the Shopify-hosted checkout page (and a few low-frequency account flows). Every transition out is announced and preserves state so the customer returns to a coherent conversation.
+
+### 11.1 Action inventory
+
+| Action | Where it lives | Leaves widget? |
+|---|---|---|
+| Browse / discover products | Conversation (product cards, carousels) | No |
+| Add to cart | Product card ATC button | No |
+| Select variant | Inline variant chips on product card (2–5 variants) | No |
+| View cart | `cart_summary` block | No |
+| Update quantity | Inline qty stepper in `cart_summary` | No |
+| Remove line item | × on each line in `cart_summary` | No |
+| Apply discount code | "Have a code?" expander in `cart_summary` | No |
+| Begin checkout | "Checkout →" button | **Yes** — Shopify checkout |
+| Express checkout (Shop Pay / Apple Pay / Google Pay) | Buttons above main checkout when eligible | **Yes** — native sheet/redirect |
+| Sign in (customer) | `auth_prompt` card → OAuth popup | Popup only — widget stays |
+| Look up orders | "Show my orders" intent → `order_status` cards | No |
+| Track shipment | Tracking link inside `order_status` | **Yes** — carrier URL (new tab) |
+| Reorder past purchase | "Reorder" button on `order_status` | No (adds to cart, opens `cart_summary`) |
+| Save cart for later | `save_cart_card` (email capture) | No |
+| Hand off to human | `handoff_card` | No |
+| Upload image (visual search) | Composer 📎 → `image_preview` | No |
+
+### 11.2 Cart summary block
+
+Rendered as an assistant turn block. Triggered after ATC ("View cart" link → expands), or by intent ("show my cart", "what's in my cart").
+
+```
+┌─────────────────────────────────────┐
+│ Cart · 3 items                $148  │  Header
+├─────────────────────────────────────┤
+│ [img] Halo Solitaire           ×    │  Line item
+│       14k White · Size 7            │
+│       [−] 1 [+]               $99   │
+├─────────────────────────────────────┤
+│ [img] Care Kit                 ×    │
+│       Polish + cloth                │
+│       [−] 1 [+]               $24   │
+├─────────────────────────────────────┤
+│ Have a code? ▾                      │  Discount expander
+├─────────────────────────────────────┤
+│ Subtotal                      $148  │
+│ Shipping        Calculated next step│
+├─────────────────────────────────────┤
+│ [ ⚡ Shop Pay                     ] │  Express (when eligible)
+│ [   Checkout →                    ] │  Primary
+│ Save cart for later                 │  Ghost link
+└─────────────────────────────────────┘
+```
+
+- **Header:** `Cart · {N} items` + running total on the right.
+- **Line items:** thumbnail, title, variant summary, qty stepper, line total, remove (×). Tapping thumbnail or title opens PDP in a new tab.
+- **Qty stepper:** `−` / number / `+`. Each click calls the MCP cart update; affected line shows a brief loading state. Stepper disabled at 1 (lower bound) — use the × to remove — and at the per-product max (upper).
+- **Remove (×):** first tap shows an inline confirmation ("Remove?"); second tap confirms. Last-item-removed shows the empty-cart state.
+- **Discount expander:** `Have a code? ▾` toggles a code input + Apply button. Success renders an additional `Discount {CODE}` line item with the saved amount; failure shows an inline error ("Code invalid or expired").
+- **Subtotal + shipping note:** subtotal is computed client-side from line items; shipping shown as "Calculated next step" — we don't replicate Shopify's shipping calculator inside the widget.
+- **Empty state:** When the cart is empty, the block collapses to a single-line "Your cart is empty. [Keep shopping →]" message that closes the cart summary on tap.
+
+### 11.3 Checkout transition
+
+The "Checkout →" button is the only place where the widget hands control to Shopify's hosted checkout. We make the transition explicit and state-preserving.
+
+**Behavior:**
+
+1. Tap → button enters loading state (`Opening checkout…`).
+2. Widget posts the cart to Shopify and retrieves the checkout URL.
+3. Widget saves the conversation state to the server with a short-lived resume token (max age 24h).
+4. Navigation:
+   - **Desktop:** opens checkout in a new tab. Widget remains open in the original tab; on returning to the original tab, the widget shows a small `Checkout opened in new tab — [View it ↗]` status line until dismissed.
+   - **Mobile:** opens checkout in the same tab (full-screen widget would otherwise occlude). On return via back-navigation, the widget reopens with the saved state.
+5. After a successful order (detected via Shopify webhook), the widget — on its next open — shows a `✓ Thanks for your order #{N} — [Track it]` state at the top of the stream.
+
+### 11.4 Express checkout
+
+When the storefront has Shop Pay / Apple Pay / Google Pay enabled and the cart is eligible, render express buttons **above** the regular Checkout button inside `cart_summary`.
+
+**Eligibility (v1):**
+
+- Wallet is enabled for the storefront (Shopify Storefront API exposes this).
+- Cart contains products from a single shop (always true in our case).
+- No subscription items in the cart (subscription cart handling is F17 / Phase 2).
+- No items requiring custom delivery instructions.
+
+If a device-native wallet is available (Apple Pay on iOS Safari, Google Pay on Chrome on Android), show that one only. Otherwise show Shop Pay as the universal fallback. Maximum one express button rendered at a time to keep the cart compact.
+
+Tapping triggers the platform's native sheet. On success, the widget receives the order confirmation event and morphs the cart into a `✓ Thanks for your order #{N}` state.
+
+### 11.5 Order lookup & history
+
+**Intents that surface order data:** "show my orders", "where's my order", "track my package", "did my order ship", "is this still coming".
+
+**Flow:**
+
+1. If the customer is not authenticated → render `auth_prompt` card. Customer signs in via the existing customer-MCP OAuth flow.
+2. After auth (or if already authenticated) → assistant queries customer MCP for recent orders.
+3. Render up to 3 most recent orders as `order_status` blocks. If more exist, a `Show older orders` chip below the last block extends the list.
+
+**`order_status` block contents:**
+
+- Order number + date.
+- Status pill: `Processing` (yellow) / `Shipped` (blue) / `Delivered` (green) / `Cancelled` (gray).
+- Items list: thumbnail + title + qty. Max 3 visible; "+N more" line if longer.
+- Total.
+- **Tracking link** when status is Shipped or Delivered (opens carrier URL in a new tab).
+- **Reorder** button → adds the order's line items to the current cart, then opens `cart_summary`. If a product is out of stock or discontinued, that line item is skipped and the assistant notes which items were skipped and why (and offers to suggest a replacement).
+
+### 11.6 Save cart for later
+
+Triggered either by cart hesitation (F7 — proactive trigger detects an idle cart) or by explicit intent ("save my cart", "email me my cart").
+
+**`save_cart_card` contents:**
+
+- Title: `Save your cart for later`.
+- Value prop: `We'll email you a link — pick up where you left off.`
+- Email input (pre-filled if the customer is authenticated).
+- Optional SMS input (collapsed link `Add SMS reminder ▾`).
+- Explicit consent line: `By saving, you agree to receive a cart reminder. No marketing.`
+- Submit button: `Send me the link`.
+- On success: card morphs to `✓ Sent — check your email`.
+
+### 11.7 Sign-in (`auth_prompt`)
+
+Appears inline whenever an action requires authentication (order lookup, reorder, save-to-account). Triggers the customer-MCP OAuth popup. On success, the originating intent resumes automatically — the customer doesn't need to re-ask. On cancellation or failure, the card stays open with a retry action and a brief explanation.
+
+### 11.8 What requires leaving the widget
+
+Some actions intentionally are not handled inside the widget — either because they belong to Shopify's hosted experience or because building them in-widget adds risk for negligible gain.
+
+- **Completing checkout** — handed off to Shopify checkout (§11.3).
+- **Account creation, password reset, billing & address management** — handed off to Shopify customer account; the widget can deep-link to these.
+- **Product reviews** — rating + count are surfaced on product cards, but writing a review happens on the PDP.
+- **Subscription management** — F17 / Phase 2; not in v1.
+- **Refund / return initiation** — handoff to the human team via `handoff_card`.
+- **Wishlist / favorites** — out of v1 scope (the save-cart flow covers the close-by use case).
+- **Multi-shop or cross-merchant cart** — not supported.
+
+**Transition principle:** every "leave the widget" action shows a transitional state (`Opening checkout…`, `Opening tracking…`) and, where the customer is expected to return, preserves widget state via a server-side resume token (max age 24h).
+
+---
+
+## 12. Edge states
 
 ### 11.1 Empty (first ever, no page context)
 
@@ -523,7 +665,7 @@ Welcome panel in conversational fallback mode. Greeting + "Looking for something
 
 ---
 
-## 12. Information architecture
+## 13. Information architecture
 
 ```
 WidgetRoot
@@ -548,7 +690,7 @@ WidgetRoot
 
 ---
 
-## 13. Accessibility (WCAG 2.1 AA)
+## 14. Accessibility (WCAG 2.1 AA)
 
 - **Landmarks:** widget root is `role="complementary"` aria-label="Shopping assistant". Stream is `role="log" aria-live="polite"`.
 - **Focus management:** opening the widget moves focus to the composer. Closing returns focus to the launcher.
@@ -561,7 +703,7 @@ WidgetRoot
 
 ---
 
-## 14. Files to touch / create
+## 15. Files to touch / create
 
 ```
 extensions/chat-bubble/
@@ -605,7 +747,7 @@ app/
 
 ---
 
-## 15. Non-goals (v1)
+## 16. Non-goals (v1)
 
 - Voice input.
 - In-widget multi-language menu (auto-detect from browser locale; full F10 is Phase 2).
@@ -614,10 +756,17 @@ app/
 - Per-pack illustrated avatars (orb covers every pack).
 - Dark-mode toggle (honors `prefers-color-scheme`; no UI control).
 - Live agent inbox UI (handoff hands off to email/Slack; we don't build the desktop).
+- Wishlist / favorites (save-cart covers the close-by use case for v1).
+- In-widget product reviews (rating + count surfaced on cards; writing reviews happens on PDP).
+- Refund / return initiation in-widget (routed via `handoff_card` to the human team).
+- Address / billing / password management (deep-link to Shopify customer account).
+- Completing checkout inside the widget (always handed off to Shopify checkout).
+- Cross-merchant or multi-shop cart.
+- Subscription cart management (F17 / Phase 2).
 
 ---
 
-## 16. Acceptance criteria
+## 17. Acceptance criteria
 
 - [ ] Launcher renders the animated gradient orb at 56/60px with shadow; resting micro-motion runs at 8s interval; both pause under `prefers-reduced-motion`.
 - [ ] Clicking the launcher opens the widget with the spec'd slide animation. Closing returns focus to the launcher.
@@ -638,10 +787,21 @@ app/
 - [ ] Counter-metric bounce-rate is tracked and surfaced (counter-metric data path is in scope for backend; UI surfacing is admin-side, out of scope for this spec).
 - [ ] WCAG 2.1 AA passes for focus, contrast, keyboard nav, reduced-motion.
 - [ ] Widget renders correctly on iOS Safari, Android Chrome, and desktop Chrome/Safari/Firefox; safe-area insets honored on mobile.
+- [ ] `cart_summary` block renders with header (count + total), line items with thumbnail/title/variant/qty stepper/remove ×/line total, discount expander, subtotal, and primary Checkout button.
+- [ ] Qty stepper and remove actions update the cart inline via MCP without leaving the widget; the affected line shows a brief loading state.
+- [ ] Discount code expander applies a valid code and shows an inline error for invalid/expired codes.
+- [ ] Express checkout button (Shop Pay / Apple Pay / Google Pay) appears above the Checkout button when the wallet is enabled, the cart is eligible, and the device supports it; only one device-appropriate wallet is shown at a time.
+- [ ] Tapping Checkout opens the checkout URL — new tab on desktop, same tab on mobile — saves a server-side resume token (max age 24h), and on return shows the appropriate post-checkout state.
+- [ ] After a successful order (Shopify webhook), the widget on next open shows `✓ Thanks for your order #{N} — [Track it]` at the top of the stream.
+- [ ] `order_status` block renders status pill, items list (with "+N more"), total, tracking link (when Shipped/Delivered), and Reorder button.
+- [ ] Order lookup requires auth: unauthenticated intent surfaces `auth_prompt`, and the originating intent resumes automatically after successful sign-in.
+- [ ] Reorder adds the original line items to the current cart and opens `cart_summary`; any skipped items (OOS / discontinued) are explicitly noted by the assistant with a replacement suggestion.
+- [ ] `save_cart_card` collects email (and optional SMS), displays the explicit consent line, and morphs to a confirmation state on submit.
+- [ ] Every "leave the widget" action (checkout, tracking, deep-link to customer account) shows a transitional state and, when return is expected, preserves widget conversation state.
 
 ---
 
-## 17. Open questions / risks
+## 18. Open questions / risks
 
 1. **Welcome resolver pack table.** This spec defines the shape but only sketches the jewelry table. Each of the 7 v1 packs needs its own page-type-to-action map. Resolved during pack implementation (out of scope here).
 2. **Brand color override + contrast warning.** Admin contrast check needs a defined algorithm (WCAG relative-luminance). Defer to admin-UI spec.
