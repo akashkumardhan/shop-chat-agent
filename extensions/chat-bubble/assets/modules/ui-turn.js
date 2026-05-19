@@ -72,5 +72,26 @@ function renderBlock(block, role, ctx) {
     );
     return slot;
   }
+  if (block.type === 'sizing_widget') {
+    const slot = el('div');
+    import('./ui-sizing-widget.js').then(({ createSizingWidget }) =>
+      slot.replaceWith(createSizingWidget(block, { onComplete: ctx.onSizingComplete }).node)
+    );
+    return slot;
+  }
+  if (block.type === 'compare_link') {
+    const slot = el('div');
+    import('./ui-compare-sheet.js').then(({ createCompareLink }) =>
+      slot.replaceWith(createCompareLink(block, { onOpen: ctx.onCompareOpen }))
+    );
+    return slot;
+  }
+  if (block.type === 'image_preview') {
+    const slot = el('div');
+    import('./ui-image-preview.js').then(({ createImagePreview }) =>
+      slot.replaceWith(createImagePreview(block))
+    );
+    return slot;
+  }
   return el('div', { class: 'swa-block-unknown', 'data-type': block.type });
 }
