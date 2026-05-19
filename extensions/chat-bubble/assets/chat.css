@@ -1508,4 +1508,26 @@
   font-weight: var(--swa-weight-medium);
 }
 
+/* ============================================================
+ * Auto-scroll pill
+ * ============================================================ */
+.swa-stream { position: relative; }
+.swa-new-messages-pill {
+  position: sticky;
+  bottom: var(--swa-space-3);
+  margin: 0 auto var(--swa-space-2);
+  display: none;
+  width: max-content;
+  background: var(--swa-color-text-primary);
+  color: var(--swa-color-bg);
+  border: none;
+  border-radius: var(--swa-radius-full);
+  padding: 6px 14px;
+  font-size: var(--swa-text-sm);
+  cursor: pointer;
+  box-shadow: var(--swa-shadow-md);
+  z-index: 1;
+}
+.swa-new-messages-pill[data-visible="true"] { display: inline-flex; align-items: center; gap: 6px; }
+
 /* Subsequent component styles are added in their respective tasks. */

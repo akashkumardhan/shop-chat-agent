@@ -1,15 +1,29 @@
 import { el } from './dom.js';
 import { createTurnNode } from './ui-turn.js';
+import { createAutoScroll } from './auto-scroll.js';
 
 export function createStream({ turnCtx = {} } = {}) {
   const welcomeSlot = el('div', { class: 'swa-stream-welcome-slot' });
   const turnsWrap = el('div', { class: 'swa-stream-turns' });
+  const newMsgPill = el('button', {
+    class: 'swa-new-messages-pill',
+    type: 'button',
+    dataset: { visible: 'false' },
+  }, '↓ New messages');
   const node = el('div', {
     class: 'swa-stream',
     role: 'log',
     'aria-live': 'polite',
     'aria-relevant': 'additions text',
-  }, welcomeSlot, turnsWrap);
+  }, welcomeSlot, turnsWrap, newMsgPill);
+
+  const auto = createAutoScroll(node);
+  newMsgPill.addEventListener('click', () => {
+    auto.forceScrollToBottom();
+  });
+  auto.onSuspended((paused) => {
+    newMsgPill.dataset.visible = paused ? 'true' : 'false';
+  });
 
   const turnNodes = new Map();
 
@@ -30,7 +44,7 @@ export function createStream({ turnCtx = {} } = {}) {
           turnNodes.get(t.id).update();
         }
       }
-      node.scrollTop = node.scrollHeight;
+      auto.scrollToBottom();
     }
     conv.subscribe(render);
     render();
