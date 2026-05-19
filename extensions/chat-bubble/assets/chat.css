@@ -351,4 +351,83 @@
   stroke-linejoin: round;
 }
 
+/* ============================================================
+ * Composer
+ * ============================================================ */
+.swa-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-3) var(--swa-space-4);
+  border-top: 1px solid var(--swa-color-border);
+  background: var(--swa-color-bg);
+  flex-shrink: 0;
+}
+
+.swa-composer-input {
+  flex: 1;
+  min-height: 36px;
+  max-height: 88px;
+  padding: var(--swa-space-2) var(--swa-space-3);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  background: var(--swa-color-bg-subtle);
+  font-family: var(--swa-font-sans);
+  font-size: var(--swa-text-base);
+  color: var(--swa-color-text-primary);
+  resize: none;
+  outline: none;
+  overflow-y: auto;
+  line-height: 1.4;
+}
+
+.swa-composer-input:focus {
+  border-color: var(--swa-color-brand);
+  background: var(--swa-color-bg);
+}
+
+@media (max-width: 480px) {
+  .swa-composer-input { font-size: 16px; }
+}
+
+.swa-composer-attach {
+  align-self: flex-end;
+  height: 36px;
+}
+
+.swa-composer-send {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--swa-color-brand);
+  color: var(--swa-color-brand-foreground);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--swa-duration-fast) var(--swa-ease-standard);
+}
+.swa-composer-send:not(:disabled):hover {
+  background: var(--swa-color-brand-hover);
+}
+.swa-composer-send:disabled {
+  background: var(--swa-color-border-strong);
+  cursor: not-allowed;
+}
+.swa-composer-send:focus-visible {
+  outline: 3px solid var(--swa-color-focus-ring);
+  outline-offset: 2px;
+}
+.swa-composer-send svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* Subsequent component styles are added in their respective tasks. */
