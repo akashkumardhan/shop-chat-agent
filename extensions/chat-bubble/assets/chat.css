@@ -584,4 +584,37 @@
   border-radius: var(--swa-radius-sm);
 }
 
+/* ============================================================
+ * Tool-use shimmer pill
+ * ============================================================ */
+.swa-tool-use {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-1) var(--swa-space-3);
+  border-radius: var(--swa-radius-full);
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+  background:
+    linear-gradient(
+      90deg,
+      var(--swa-color-bg-subtle) 0%,
+      var(--swa-color-bg-elevated) 50%,
+      var(--swa-color-bg-subtle) 100%
+    );
+  background-size: 200% 100%;
+  animation: swa-tool-shimmer 1.5s linear infinite;
+  align-self: flex-start;
+}
+.swa-tool-use-icon { font-size: 0.9em; }
+.swa-tool-use-params {
+  font-family: var(--swa-font-mono);
+  font-size: 0.9em;
+  color: var(--swa-color-text-primary);
+}
+@keyframes swa-tool-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* Subsequent component styles are added in their respective tasks. */
