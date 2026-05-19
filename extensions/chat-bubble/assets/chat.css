@@ -430,4 +430,45 @@
   stroke-linejoin: round;
 }
 
+/* ============================================================
+ * Stream (placeholder — populated in Plan 2)
+ * ============================================================ */
+.swa-stream {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--swa-space-4);
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+.swa-stream::-webkit-scrollbar { width: 8px; }
+.swa-stream::-webkit-scrollbar-thumb {
+  background: var(--swa-color-border-strong);
+  border-radius: var(--swa-radius-sm);
+}
+
+.swa-stream-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--swa-color-text-tertiary);
+  font-size: var(--swa-text-sm);
+}
+
+/* ============================================================
+ * Footer
+ * ============================================================ */
+.swa-footer {
+  padding: var(--swa-space-2) var(--swa-space-4);
+  border-top: 1px solid var(--swa-color-border);
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-tertiary);
+  text-align: center;
+  flex-shrink: 0;
+}
+.swa-footer a {
+  color: var(--swa-color-text-tertiary);
+  text-decoration: underline;
+}
+
 /* Subsequent component styles are added in their respective tasks. */
