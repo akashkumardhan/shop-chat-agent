@@ -1,4 +1,5 @@
 import { el, qs } from './dom.js';
+import { trapFocus } from './a11y.js';
 
 /**
  * Builds the window shell.
@@ -30,6 +31,7 @@ export function createWindow({ state, launcher }) {
   window.addEventListener('resize', setViewportVar);
 
   let lastFocused = null;
+  let releaseTrap = null;
   state.subscribe('isOpen', (isOpen) => {
     node.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
     if (isOpen) {
@@ -39,8 +41,10 @@ export function createWindow({ state, launcher }) {
         const composerInput = qs('.swa-composer input, .swa-composer textarea', node);
         (composerInput || node).focus();
       });
+      releaseTrap = trapFocus(node);
     } else {
       document.body.classList.remove('swa-locked');
+      if (releaseTrap) { releaseTrap(); releaseTrap = null; }
       if (lastFocused && typeof lastFocused.focus === 'function') {
         lastFocused.focus();
       } else if (launcher) {
