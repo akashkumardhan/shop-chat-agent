@@ -1130,4 +1130,70 @@
   text-decoration: underline;
 }
 
+/* ============================================================
+ * Save cart card
+ * ============================================================ */
+.swa-save-cart {
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+}
+.swa-save-cart-title {
+  font-size: var(--swa-text-md);
+  font-weight: var(--swa-weight-semibold);
+  margin-bottom: var(--swa-space-1);
+}
+.swa-save-cart-sub {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+  margin-bottom: var(--swa-space-3);
+}
+.swa-save-cart-field {
+  margin-bottom: var(--swa-space-2);
+}
+.swa-save-cart-field input {
+  width: 100%;
+  padding: 8px var(--swa-space-2);
+  border: 1px solid var(--swa-color-border-strong);
+  border-radius: var(--swa-radius-sm);
+  font: inherit;
+  font-size: var(--swa-text-base);
+}
+.swa-save-cart-sms-toggle {
+  background: none;
+  border: none;
+  color: var(--swa-color-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  font-size: var(--swa-text-sm);
+  margin: var(--swa-space-1) 0 var(--swa-space-2);
+}
+.swa-save-cart-consent {
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-tertiary);
+  margin-bottom: var(--swa-space-2);
+  line-height: 1.5;
+}
+.swa-save-cart-submit {
+  width: 100%;
+  background: var(--swa-color-brand);
+  color: var(--swa-color-brand-foreground);
+  border: none;
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-2);
+  font-weight: var(--swa-weight-medium);
+  cursor: pointer;
+}
+.swa-save-cart-submit:disabled { background: var(--swa-color-border-strong); cursor: not-allowed; }
+.swa-save-cart-success {
+  background: var(--swa-color-success-bg);
+  color: var(--swa-color-success-fg);
+  padding: var(--swa-space-2);
+  border-radius: var(--swa-radius-sm);
+  text-align: center;
+  font-size: var(--swa-text-sm);
+  margin-top: var(--swa-space-2);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
