@@ -617,4 +617,50 @@
   100% { background-position: -200% 0; }
 }
 
+/* ============================================================
+ * Quick-reply dock
+ * ============================================================ */
+.swa-quick-replies {
+  padding: var(--swa-space-2) var(--swa-space-4) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--swa-space-2);
+  flex-shrink: 0;
+  border-top: 1px solid transparent;
+  transition: max-height var(--swa-duration-base) var(--swa-ease-standard);
+}
+.swa-quick-replies:empty {
+  padding: 0;
+}
+
+.swa-chip {
+  padding: 6px 12px;
+  border: 1px solid var(--swa-color-border-strong);
+  border-radius: var(--swa-radius-full);
+  background: var(--swa-color-bg);
+  color: var(--swa-color-text-primary);
+  font-size: var(--swa-text-sm);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--swa-duration-fast), border-color var(--swa-duration-fast);
+}
+.swa-chip:hover {
+  background: var(--swa-color-bg-subtle);
+}
+.swa-chip:focus-visible {
+  outline: 2px solid var(--swa-color-focus-ring);
+  outline-offset: 1px;
+}
+.swa-chip-primary {
+  background: var(--swa-color-brand-soft);
+  color: var(--swa-color-info-fg);
+  border-color: transparent;
+  font-weight: var(--swa-weight-medium);
+}
+.swa-chip-primary:hover {
+  background: var(--swa-color-brand-soft);
+  filter: brightness(0.95);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
