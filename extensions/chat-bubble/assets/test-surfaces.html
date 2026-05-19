@@ -5,34 +5,21 @@
   <title>Shop AI Widget — Surface Tests</title>
   <link rel="stylesheet" href="./chat.css">
   <style>
-    body {
-      margin: 0;
-      padding: 40px;
-      font-family: -apple-system, sans-serif;
-      background: #f5f5f7;
-    }
+    body { margin: 0; padding: 40px; font-family: -apple-system, sans-serif; background: #f5f5f7; }
     h2 { font-size: 14px; margin: 40px 0 12px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stage {
-      background: #fff;
-      padding: 24px;
-      border-radius: 12px;
-      min-height: 80px;
-      position: relative;
-    }
+    .stage { background: #fff; padding: 24px; border-radius: 12px; min-height: 80px; position: relative; }
     .grid { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
-    .row { padding: 12px 0; }
   </style>
 </head>
 <body>
-  <h1>Shop AI Widget — Surface Tests</h1>
-  <p>Plan 1: foundation surfaces in isolation. Refresh after changing chat.css to see updates.</p>
+  <h1>Shop AI Widget — Surface Tests (Plan 1 + Plan 2)</h1>
 
-  <h2>Orbs (at every size)</h2>
+  <h2>Orbs</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
     <div class="grid" id="orb-grid"></div>
   </div>
 
-  <h2>Launcher (resting + pill)</h2>
+  <h2>Launcher</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;height:140px;">
     <div id="launcher-stage"></div>
   </div>
@@ -40,6 +27,26 @@
   <h2>Header</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
     <div id="header-stage" style="width:420px;"></div>
+  </div>
+
+  <h2>Welcome panel — with primary action</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="welcome-with-hero" style="width:420px;"></div>
+  </div>
+
+  <h2>Welcome panel — fallback (no primary action)</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="welcome-fallback" style="width:420px;"></div>
+  </div>
+
+  <h2>Sample conversation (text + tool-use + assistant markdown)</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="conv-stage" style="width:420px;"></div>
+  </div>
+
+  <h2>Quick-reply dock</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="chips-stage" style="width:420px;"></div>
   </div>
 
   <h2>Composer</h2>
@@ -53,38 +60,105 @@
     import { createHeader } from './modules/ui-header.js';
     import { createComposer } from './modules/ui-composer.js';
     import { createState, INITIAL_STATE } from './modules/state.js';
+    import { createConversation } from './modules/conversation.js';
+    import { createTurnNode } from './modules/ui-turn.js';
+    import { createWelcomePanel } from './modules/ui-welcome.js';
+    import { createQuickReplies } from './modules/ui-quick-replies.js';
 
-    // Orb grid
-    const orbGrid = document.getElementById('orb-grid');
+    // Orbs
     for (const size of [16, 22, 32, 60, 96]) {
-      const wrap = document.createElement('div');
-      wrap.style.textAlign = 'center';
       const o = createOrb({ size });
-      const lbl = document.createElement('div');
-      lbl.style.fontSize = '11px';
-      lbl.style.color = '#888';
-      lbl.style.marginTop = '6px';
-      lbl.textContent = `${size}px`;
-      wrap.append(o, lbl);
-      orbGrid.appendChild(wrap);
+      const w = document.createElement('div');
+      w.style.textAlign = 'center';
+      const l = document.createElement('div');
+      l.style.cssText = 'font-size:11px;color:#888;margin-top:6px';
+      l.textContent = `${size}px`;
+      w.append(o, l);
+      document.getElementById('orb-grid').appendChild(w);
     }
 
-    // Launcher — resting + pill states (separate state instances)
+    // Launcher
     const restState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
     const pillState = createState({ ...INITIAL_STATE, shopName: 'Shop LC', hasUnread: true, pendingMessagePreview: 'Found 3 rings in your size.' });
-
-    const lstage = document.getElementById('launcher-stage');
     const restCtl = createLauncher({ state: restState });
     const pillCtl = createLauncher({ state: pillState });
+    const lstage = document.getElementById('launcher-stage');
     lstage.append(restCtl.node, document.createTextNode('   '), pillCtl.node, pillCtl.previewBubble);
 
     // Header
     const headerState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
     document.getElementById('header-stage').appendChild(createHeader({ state: headerState }));
 
+    // Welcome — with hero
+    document.getElementById('welcome-with-hero').appendChild(createWelcomePanel({
+      resolved: {
+        greeting: 'Hi — what brings you in?',
+        context_line: 'Looking at the Halo Solitaire',
+        primary_action: {
+          flow_id: 'sizing',
+          label: 'Help with sizing',
+          subtitle: 'Walk through ring sizing in under a minute.',
+          button_text: 'Start the size guide →',
+        },
+        chips: [
+          { intent: 'compare', label: 'Compare similar' },
+          { intent: 'gift', label: "It's a gift" },
+          { intent: 'best', label: 'Show bestsellers' },
+        ],
+      },
+      onPrimaryAction: (flow) => alert(`primary: ${flow}`),
+      onChip: (intent) => alert(`chip: ${intent}`),
+    }));
+
+    // Welcome — fallback
+    document.getElementById('welcome-fallback').appendChild(createWelcomePanel({
+      resolved: {
+        greeting: 'Hi — what brings you in?',
+        context_line: null,
+        primary_action: null,
+        chips: [
+          { intent: 'gift', label: "It's a gift", isPrimary: true },
+          { intent: 'best', label: 'Show bestsellers' },
+          { intent: 'returns', label: 'Returns policy' },
+        ],
+      },
+      onPrimaryAction: () => {},
+      onChip: (intent) => alert(`chip: ${intent}`),
+    }));
+
+    // Sample conversation
+    const conv = createConversation();
+    const convStage = document.getElementById('conv-stage');
+    function refresh() {
+      convStage.innerHTML = '';
+      for (const t of conv.getTurns()) {
+        const ctl = createTurnNode(t);
+        convStage.appendChild(ctl.node);
+      }
+    }
+    conv.subscribe(refresh);
+    conv.appendUserMessage('Help me with ring sizing');
+    const aTurn = conv.appendAssistantTurn();
+    conv.appendTextChunk(aTurn.id, 'Happy to. A few quick questions — should only take a minute.');
+    conv.appendBlock(aTurn.id, { type: 'tool_use', label: 'Searching', params: 'size 7 · 4–5mm bands' });
+    const a2 = conv.appendAssistantTurn();
+    conv.appendTextChunk(a2.id, '**Three rings** in your size, in stock. The halo settings tend to feel half a size smaller — flagging the closest matches first.');
+    refresh();
+
+    // Quick-reply dock
+    const chipsStage = document.getElementById('chips-stage');
+    const qr = createQuickReplies({ onSelect: (c) => alert(`chip: ${c.label}`) });
+    chipsStage.appendChild(qr.node);
+    qr.setChips([
+      { label: 'Compare in detail', intent: 'compare', isPrimary: true },
+      { label: 'Show more', intent: 'more' },
+      { label: 'Find smaller budget', intent: 'budget' },
+    ]);
+
     // Composer
-    const composer = createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) });
-    document.getElementById('composer-stage').appendChild(composer.node);
+    document.getElementById('composer-stage').appendChild(
+      createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) }).node
+    );
   </script>
 </body>
 </html>
