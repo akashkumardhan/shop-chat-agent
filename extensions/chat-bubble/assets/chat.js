@@ -51,10 +51,6 @@ function init() {
     root.dataset.state = isOpen ? 'open' : 'closed';
     if (isOpen) requestAnimationFrame(() => composer.focus());
   });
-
-  // DEV-only — exposes state for manual testing in browser devtools.
-  // Removed in Task 14.
-  if (typeof window !== 'undefined') window.__swaState = state;
 }
 
 if (document.readyState === 'loading') {
