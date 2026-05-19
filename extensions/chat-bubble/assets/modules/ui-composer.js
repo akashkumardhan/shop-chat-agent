@@ -12,16 +12,30 @@ function icon(inner) {
   return svg;
 }
 
-/**
- * Builds the composer. Calls onSubmit(value) on Enter or send-button click.
- * onAttach (optional) called on paperclip click.
- */
-export function createComposer({ onSubmit, onAttach } = {}) {
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+export function createComposer({ onSubmit, onAttachImage } = {}) {
   const textarea = el('textarea', {
     class: 'swa-composer-input',
     rows: '1',
     placeholder: 'Type your message…',
     'aria-label': 'Message',
+  });
+
+  const fileInput = el('input', {
+    type: 'file',
+    accept: 'image/*',
+    style: 'display:none',
+    'aria-hidden': 'true',
   });
 
   const attachBtn = el('button', {
@@ -37,7 +51,11 @@ export function createComposer({ onSubmit, onAttach } = {}) {
     disabled: 'disabled',
   }, icon(ICONS.send));
 
-  const node = el('form', { class: 'swa-composer' }, attachBtn, textarea, sendBtn);
+  const pendingImageWrap = el('div', { class: 'swa-composer-pending-image', style: 'display:none' });
+
+  const node = el('form', { class: 'swa-composer' }, attachBtn, fileInput, textarea, sendBtn);
+
+  let pendingImage = null;
 
   function autoExpand() {
     textarea.style.height = 'auto';
@@ -46,36 +64,70 @@ export function createComposer({ onSubmit, onAttach } = {}) {
   }
 
   function syncEnabled() {
-    sendBtn.disabled = textarea.value.trim().length === 0;
+    sendBtn.disabled = textarea.value.trim().length === 0 && !pendingImage;
+  }
+
+  function clearImage() {
+    pendingImage = null;
+    pendingImageWrap.innerHTML = '';
+    pendingImageWrap.style.display = 'none';
+    attachBtn.dataset.pending = 'false';
+    syncEnabled();
+  }
+
+  function setPendingImage(image) {
+    pendingImage = image;
+    pendingImageWrap.innerHTML = '';
+    pendingImageWrap.style.display = 'flex';
+    pendingImageWrap.appendChild(el('img', { src: image.dataUrl, alt: image.name }));
+    pendingImageWrap.appendChild(el('span', null, image.name));
+    const remove = el('button', { type: 'button', 'aria-label': 'Remove image' }, '×');
+    remove.addEventListener('click', clearImage);
+    pendingImageWrap.appendChild(remove);
+    attachBtn.dataset.pending = 'true';
+    syncEnabled();
   }
 
   function submit() {
-    const val = textarea.value.trim();
-    if (!val) return;
+    const text = textarea.value.trim();
+    if (!text && !pendingImage) return;
+    const payload = { text };
+    if (pendingImage) payload.image = pendingImage;
     textarea.value = '';
+    clearImage();
     autoExpand();
     syncEnabled();
-    onSubmit && onSubmit(val);
+    onSubmit && onSubmit(payload);
   }
 
-  textarea.addEventListener('input', () => {
-    autoExpand();
-    syncEnabled();
-  });
-
+  textarea.addEventListener('input', () => { autoExpand(); syncEnabled(); });
   textarea.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      submit();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+  });
+  node.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
+
+  attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    fileInput.value = '';
+    if (!file) return;
+    if (file.size > MAX_IMAGE_BYTES) {
+      alert('Image too large (max 5MB).');
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Only image files are supported.');
+      return;
+    }
+    try {
+      const dataUrl = await readAsDataUrl(file);
+      const image = { dataUrl, name: file.name };
+      setPendingImage(image);
+      onAttachImage && onAttachImage(image);
+    } catch {
+      alert('Could not read image.');
     }
   });
-
-  node.addEventListener('submit', (e) => {
-    e.preventDefault();
-    submit();
-  });
-
-  attachBtn.addEventListener('click', () => onAttach && onAttach());
 
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === '/') {
@@ -84,5 +136,5 @@ export function createComposer({ onSubmit, onAttach } = {}) {
     }
   });
 
-  return { node, submit, focus: () => textarea.focus() };
+  return { node, pendingImageNode: pendingImageWrap, submit, focus: () => textarea.focus(), clearImage };
 }

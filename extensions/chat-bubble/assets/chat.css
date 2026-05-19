@@ -1612,4 +1612,49 @@
   margin: var(--swa-space-2) var(--swa-space-4);
 }
 
+/* ============================================================
+ * Image preview
+ * ============================================================ */
+.swa-image-preview {
+  max-width: 240px;
+  border-radius: var(--swa-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--swa-color-border);
+  align-self: flex-end;
+}
+.swa-image-preview img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.swa-composer-attach[data-pending="true"] {
+  background: var(--swa-color-brand-soft);
+  color: var(--swa-color-info-fg);
+}
+.swa-composer-pending-image {
+  display: flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-1) var(--swa-space-2);
+  background: var(--swa-color-bg-subtle);
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-secondary);
+  margin: 0 var(--swa-space-4) var(--swa-space-2);
+}
+.swa-composer-pending-image img {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--swa-radius-sm);
+  object-fit: cover;
+}
+.swa-composer-pending-image button {
+  background: none;
+  border: none;
+  color: var(--swa-color-text-tertiary);
+  cursor: pointer;
+  padding: 0;
+  margin-left: auto;
+}
+
 /* Subsequent component styles are added in their respective tasks. */

@@ -36,7 +36,7 @@ describe('createComposer', () => {
     ta.dispatchEvent(new Event('input'));
     const e = new KeyboardEvent('keydown', { key: 'Enter' });
     ta.dispatchEvent(e);
-    expect(onSubmit).toHaveBeenCalledWith('hello');
+    expect(onSubmit).toHaveBeenCalledWith({ text: 'hello' });
   });
 
   it('Shift+Enter does NOT submit', () => {
