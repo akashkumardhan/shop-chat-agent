@@ -1406,4 +1406,106 @@
   font-size: var(--swa-text-sm);
 }
 
+/* ============================================================
+ * Compare sheet
+ * ============================================================ */
+.swa-compare-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-2) var(--swa-space-3);
+  background: var(--swa-color-bg-subtle);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  font-size: var(--swa-text-sm);
+  cursor: pointer;
+  align-self: flex-start;
+}
+.swa-compare-link:hover { background: var(--swa-color-bg-elevated); }
+
+.swa-compare-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--swa-duration-base);
+  z-index: var(--swa-z-modal);
+}
+.swa-compare-sheet-backdrop[data-visible="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.swa-compare-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-height: 80%;
+  background: var(--swa-color-bg);
+  border-top-left-radius: var(--swa-radius-xl);
+  border-top-right-radius: var(--swa-radius-xl);
+  display: flex;
+  flex-direction: column;
+  transform: translateY(100%);
+  transition: transform var(--swa-duration-slow) var(--swa-ease-emphasized);
+  overflow: hidden;
+  z-index: calc(var(--swa-z-modal) + 1);
+}
+.swa-compare-sheet[data-open="true"] { transform: translateY(0); }
+.swa-compare-sheet-header {
+  padding: var(--swa-space-3);
+  border-bottom: 1px solid var(--swa-color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.swa-compare-sheet-title {
+  font-weight: var(--swa-weight-semibold);
+  font-size: var(--swa-text-md);
+}
+.swa-compare-sheet-body {
+  flex: 1;
+  overflow: auto;
+  padding: var(--swa-space-3);
+}
+.swa-compare-table {
+  display: grid;
+  gap: var(--swa-space-1);
+  min-width: 100%;
+}
+.swa-compare-row {
+  display: grid;
+  grid-template-columns: 100px repeat(var(--cols, 3), 1fr);
+  gap: var(--swa-space-2);
+  font-size: var(--swa-text-sm);
+  padding: var(--swa-space-1) 0;
+  border-bottom: 1px solid var(--swa-color-border);
+}
+.swa-compare-row .label {
+  position: sticky;
+  left: 0;
+  background: var(--swa-color-bg);
+  color: var(--swa-color-text-tertiary);
+}
+.swa-compare-row.head {
+  font-weight: var(--swa-weight-semibold);
+  color: var(--swa-color-text-primary);
+}
+.swa-compare-row .thumb {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--swa-color-bg-subtle);
+  border-radius: var(--swa-radius-sm);
+  object-fit: cover;
+}
+.swa-compare-verdict {
+  background: var(--swa-color-brand-soft);
+  color: var(--swa-color-info-fg);
+  padding: var(--swa-space-2) var(--swa-space-3);
+  border-top: 1px solid var(--swa-color-border);
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
