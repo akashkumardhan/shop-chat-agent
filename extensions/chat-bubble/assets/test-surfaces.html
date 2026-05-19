@@ -12,7 +12,7 @@
   </style>
 </head>
 <body>
-  <h1>Shop AI Widget — Surface Tests (Plan 1 + Plan 2)</h1>
+  <h1>Shop AI Widget — Surface Tests (Plans 1, 2, 3)</h1>
 
   <h2>Orbs</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
@@ -29,24 +29,44 @@
     <div id="header-stage" style="width:420px;"></div>
   </div>
 
-  <h2>Welcome panel — with primary action</h2>
+  <h2>Product card — full</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
-    <div id="welcome-with-hero" style="width:420px;"></div>
+    <div id="product-card-stage" style="width:380px;"></div>
   </div>
 
-  <h2>Welcome panel — fallback (no primary action)</h2>
+  <h2>Product card — on sale</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
-    <div id="welcome-fallback" style="width:420px;"></div>
+    <div id="product-card-sale-stage" style="width:380px;"></div>
   </div>
 
-  <h2>Sample conversation (text + tool-use + assistant markdown)</h2>
+  <h2>Product carousel</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
-    <div id="conv-stage" style="width:420px;"></div>
+    <div id="product-carousel-stage" style="width:420px;"></div>
   </div>
 
-  <h2>Quick-reply dock</h2>
+  <h2>Cart summary</h2>
   <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
-    <div id="chips-stage" style="width:420px;"></div>
+    <div id="cart-stage" style="width:420px;"></div>
+  </div>
+
+  <h2>Save-cart card</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="savecart-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Order status — shipped</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="order-shipped-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Order status — processing</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="order-processing-stage" style="width:380px;"></div>
+  </div>
+
+  <h2>Auth prompt</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="auth-stage" style="width:380px;"></div>
   </div>
 
   <h2>Composer</h2>
@@ -60,12 +80,12 @@
     import { createHeader } from './modules/ui-header.js';
     import { createComposer } from './modules/ui-composer.js';
     import { createState, INITIAL_STATE } from './modules/state.js';
-    import { createConversation } from './modules/conversation.js';
-    import { createTurnNode } from './modules/ui-turn.js';
-    import { createWelcomePanel } from './modules/ui-welcome.js';
-    import { createQuickReplies } from './modules/ui-quick-replies.js';
+    import { createProductCard, createProductCarousel } from './modules/ui-product-card.js';
+    import { createCartSummary } from './modules/ui-cart-summary.js';
+    import { createSaveCartCard } from './modules/ui-save-cart.js';
+    import { createOrderStatus } from './modules/ui-order-status.js';
+    import { createAuthPrompt } from './modules/ui-auth-prompt.js';
 
-    // Orbs
     for (const size of [16, 22, 32, 60, 96]) {
       const o = createOrb({ size });
       const w = document.createElement('div');
@@ -77,88 +97,69 @@
       document.getElementById('orb-grid').appendChild(w);
     }
 
-    // Launcher
     const restState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
     const pillState = createState({ ...INITIAL_STATE, shopName: 'Shop LC', hasUnread: true, pendingMessagePreview: 'Found 3 rings in your size.' });
+    const lstage = document.getElementById('launcher-stage');
     const restCtl = createLauncher({ state: restState });
     const pillCtl = createLauncher({ state: pillState });
-    const lstage = document.getElementById('launcher-stage');
     lstage.append(restCtl.node, document.createTextNode('   '), pillCtl.node, pillCtl.previewBubble);
 
-    // Header
-    const headerState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
-    document.getElementById('header-stage').appendChild(createHeader({ state: headerState }));
+    document.getElementById('header-stage').appendChild(createHeader({ state: createState({ ...INITIAL_STATE, shopName: 'Shop LC' }) }));
 
-    // Welcome — with hero
-    document.getElementById('welcome-with-hero').appendChild(createWelcomePanel({
-      resolved: {
-        greeting: 'Hi — what brings you in?',
-        context_line: 'Looking at the Halo Solitaire',
-        primary_action: {
-          flow_id: 'sizing',
-          label: 'Help with sizing',
-          subtitle: 'Walk through ring sizing in under a minute.',
-          button_text: 'Start the size guide →',
-        },
-        chips: [
-          { intent: 'compare', label: 'Compare similar' },
-          { intent: 'gift', label: "It's a gift" },
-          { intent: 'best', label: 'Show bestsellers' },
-        ],
-      },
-      onPrimaryAction: (flow) => alert(`primary: ${flow}`),
-      onChip: (intent) => alert(`chip: ${intent}`),
-    }));
+    const product = {
+      id: 'p1', title: 'Diamond Halo Engagement Ring', subtitle: '14k White Gold · VS2 Clarity',
+      image: 'https://picsum.photos/seed/halo/600/400', url: '#',
+      price: 249900, currency: 'USD',
+      rating: { average: 4.8, count: 124 },
+      status: { label: 'Ships in 3 days' },
+      variants: [{ id: 'v1', label: 'Size 6', available: true }, { id: 'v2', label: 'Size 7', available: true }, { id: 'v3', label: 'Size 8', available: false }],
+    };
+    document.getElementById('product-card-stage').appendChild(createProductCard(product));
 
-    // Welcome — fallback
-    document.getElementById('welcome-fallback').appendChild(createWelcomePanel({
-      resolved: {
-        greeting: 'Hi — what brings you in?',
-        context_line: null,
-        primary_action: null,
-        chips: [
-          { intent: 'gift', label: "It's a gift", isPrimary: true },
-          { intent: 'best', label: 'Show bestsellers' },
-          { intent: 'returns', label: 'Returns policy' },
-        ],
-      },
-      onPrimaryAction: () => {},
-      onChip: (intent) => alert(`chip: ${intent}`),
-    }));
+    const saleProduct = { ...product, price: 199900, compareAtPrice: 249900, title: 'Halo Ring — On sale', status: 'low_stock' };
+    document.getElementById('product-card-sale-stage').appendChild(createProductCard(saleProduct));
 
-    // Sample conversation
-    const conv = createConversation();
-    const convStage = document.getElementById('conv-stage');
-    function refresh() {
-      convStage.innerHTML = '';
-      for (const t of conv.getTurns()) {
-        const ctl = createTurnNode(t);
-        convStage.appendChild(ctl.node);
-      }
-    }
-    conv.subscribe(refresh);
-    conv.appendUserMessage('Help me with ring sizing');
-    const aTurn = conv.appendAssistantTurn();
-    conv.appendTextChunk(aTurn.id, 'Happy to. A few quick questions — should only take a minute.');
-    conv.appendBlock(aTurn.id, { type: 'tool_use', label: 'Searching', params: 'size 7 · 4–5mm bands' });
-    const a2 = conv.appendAssistantTurn();
-    conv.appendTextChunk(a2.id, '**Three rings** in your size, in stock. The halo settings tend to feel half a size smaller — flagging the closest matches first.');
-    refresh();
+    document.getElementById('product-carousel-stage').appendChild(createProductCarousel([
+      { id: 'a', title: 'Halo Solitaire', subtitle: '14k · Size 7', image: 'https://picsum.photos/seed/a/300/300', price: 249900, url: '#' },
+      { id: 'b', title: 'Three-Stone',     subtitle: '18k · Size 7', image: 'https://picsum.photos/seed/b/300/300', price: 320000, url: '#' },
+      { id: 'c', title: 'Classic Solitaire', subtitle: '14k · Size 7', image: 'https://picsum.photos/seed/c/300/300', price: 189000, url: '#' },
+      { id: 'd', title: 'Pavé Band',         subtitle: '14k · Size 7', image: 'https://picsum.photos/seed/d/300/300', price: 149000, url: '#' },
+    ]));
 
-    // Quick-reply dock
-    const chipsStage = document.getElementById('chips-stage');
-    const qr = createQuickReplies({ onSelect: (c) => alert(`chip: ${c.label}`) });
-    chipsStage.appendChild(qr.node);
-    qr.setChips([
-      { label: 'Compare in detail', intent: 'compare', isPrimary: true },
-      { label: 'Show more', intent: 'more' },
-      { label: 'Find smaller budget', intent: 'budget' },
-    ]);
+    const fakeCart = {
+      itemCount: 3, subtotal: 14850, total: 14850, currency: 'USD',
+      lines: [
+        { key: 'k1', title: 'Halo Solitaire', variant: '14k White · Size 7', quantity: 1, linePrice: 9900, image: 'https://picsum.photos/seed/halo/100/100' },
+        { key: 'k2', title: 'Care Kit', variant: 'Polish + cloth', quantity: 2, linePrice: 4950, image: 'https://picsum.photos/seed/care/100/100' },
+      ],
+    };
+    document.getElementById('cart-stage').appendChild(createCartSummary({ initialCart: fakeCart }).node);
 
-    // Composer
-    document.getElementById('composer-stage').appendChild(
-      createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) }).node
-    );
+    document.getElementById('savecart-stage').appendChild(createSaveCartCard({ onSubmit: async ({ email }) => { alert(`Save link for ${email}`); } }));
+
+    document.getElementById('order-shipped-stage').appendChild(createOrderStatus({
+      orderNumber: '1234', date: 'May 10', status: 'shipped',
+      total: 14850, currency: 'USD',
+      items: [
+        { title: 'Halo Solitaire', image: 'https://picsum.photos/seed/halo/100/100', quantity: 1 },
+        { title: 'Care Kit', image: 'https://picsum.photos/seed/care/100/100', quantity: 2 },
+      ],
+      trackingUrl: 'https://example.com/track/1234',
+    }, { onReorder: () => alert('reorder!') }));
+
+    document.getElementById('order-processing-stage').appendChild(createOrderStatus({
+      orderNumber: '5678', date: 'today', status: 'processing',
+      total: 24000, currency: 'USD',
+      items: [{ title: 'Three-stone ring', image: 'https://picsum.photos/seed/3st/100/100', quantity: 1 }],
+    }, { onReorder: () => alert('reorder!') }));
+
+    document.getElementById('auth-stage').appendChild(createAuthPrompt({
+      authUrl: '#',
+      title: 'Sign in to see your orders',
+      subtitle: "Connect your account — we won't see your password.",
+    }, { onSuccess: () => alert('connected') }));
+
+    document.getElementById('composer-stage').appendChild(createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) }).node);
   </script>
 </body>
 </html>
