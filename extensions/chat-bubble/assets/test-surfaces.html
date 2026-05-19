@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Shop AI Widget — Surface Tests</title>
+  <link rel="stylesheet" href="./chat.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 40px;
+      font-family: -apple-system, sans-serif;
+      background: #f5f5f7;
+    }
+    h2 { font-size: 14px; margin: 40px 0 12px; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+    .stage {
+      background: #fff;
+      padding: 24px;
+      border-radius: 12px;
+      min-height: 80px;
+      position: relative;
+    }
+    .grid { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+    .row { padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <h1>Shop AI Widget — Surface Tests</h1>
+  <p>Plan 1: foundation surfaces in isolation. Refresh after changing chat.css to see updates.</p>
+
+  <h2>Orbs (at every size)</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div class="grid" id="orb-grid"></div>
+  </div>
+
+  <h2>Launcher (resting + pill)</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;height:140px;">
+    <div id="launcher-stage"></div>
+  </div>
+
+  <h2>Header</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="header-stage" style="width:420px;"></div>
+  </div>
+
+  <h2>Composer</h2>
+  <div class="stage shop-ai-chat-container" style="position:relative;bottom:auto;right:auto;">
+    <div id="composer-stage" style="width:420px;"></div>
+  </div>
+
+  <script type="module">
+    import { createOrb } from './modules/orb.js';
+    import { createLauncher } from './modules/ui-launcher.js';
+    import { createHeader } from './modules/ui-header.js';
+    import { createComposer } from './modules/ui-composer.js';
+    import { createState, INITIAL_STATE } from './modules/state.js';
+
+    // Orb grid
+    const orbGrid = document.getElementById('orb-grid');
+    for (const size of [16, 22, 32, 60, 96]) {
+      const wrap = document.createElement('div');
+      wrap.style.textAlign = 'center';
+      const o = createOrb({ size });
+      const lbl = document.createElement('div');
+      lbl.style.fontSize = '11px';
+      lbl.style.color = '#888';
+      lbl.style.marginTop = '6px';
+      lbl.textContent = `${size}px`;
+      wrap.append(o, lbl);
+      orbGrid.appendChild(wrap);
+    }
+
+    // Launcher — resting + pill states (separate state instances)
+    const restState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
+    const pillState = createState({ ...INITIAL_STATE, shopName: 'Shop LC', hasUnread: true, pendingMessagePreview: 'Found 3 rings in your size.' });
+
+    const lstage = document.getElementById('launcher-stage');
+    const restCtl = createLauncher({ state: restState });
+    const pillCtl = createLauncher({ state: pillState });
+    lstage.append(restCtl.node, document.createTextNode('   '), pillCtl.node, pillCtl.previewBubble);
+
+    // Header
+    const headerState = createState({ ...INITIAL_STATE, shopName: 'Shop LC' });
+    document.getElementById('header-stage').appendChild(createHeader({ state: headerState }));
+
+    // Composer
+    const composer = createComposer({ onSubmit: (v) => alert(`Sent: ${v}`) });
+    document.getElementById('composer-stage').appendChild(composer.node);
+  </script>
+</body>
+</html>
