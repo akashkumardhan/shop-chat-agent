@@ -1196,4 +1196,91 @@
   margin-top: var(--swa-space-2);
 }
 
+/* ============================================================
+ * Order status card
+ * ============================================================ */
+.swa-order {
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+}
+.swa-order-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--swa-space-2);
+}
+.swa-order-number {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+}
+.swa-order-status-pill {
+  font-size: var(--swa-text-xs);
+  font-weight: var(--swa-weight-medium);
+  padding: 2px var(--swa-space-2);
+  border-radius: var(--swa-radius-full);
+}
+.swa-order-status-pill[data-status="processing"] { background: var(--swa-color-warning-bg); color: var(--swa-color-warning-fg); }
+.swa-order-status-pill[data-status="shipped"]    { background: var(--swa-color-info-bg);    color: var(--swa-color-info-fg); }
+.swa-order-status-pill[data-status="delivered"]  { background: var(--swa-color-success-bg); color: var(--swa-color-success-fg); }
+.swa-order-status-pill[data-status="cancelled"]  { background: var(--swa-color-bg-subtle);  color: var(--swa-color-text-tertiary); }
+
+.swa-order-items {
+  border-top: 1px solid var(--swa-color-border);
+  border-bottom: 1px solid var(--swa-color-border);
+  padding: var(--swa-space-2) 0;
+  margin: var(--swa-space-2) 0;
+}
+.swa-order-item {
+  display: flex;
+  align-items: center;
+  gap: var(--swa-space-2);
+  padding: var(--swa-space-1) 0;
+  font-size: var(--swa-text-sm);
+}
+.swa-order-item img {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--swa-radius-sm);
+  object-fit: cover;
+}
+.swa-order-item-meta { flex: 1; }
+.swa-order-item-qty {
+  color: var(--swa-color-text-tertiary);
+  font-size: var(--swa-text-xs);
+}
+.swa-order-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+  margin-bottom: var(--swa-space-3);
+}
+.swa-order-actions {
+  display: flex;
+  gap: var(--swa-space-2);
+}
+.swa-order-actions > * { flex: 1; }
+.swa-order-track {
+  text-align: center;
+  padding: var(--swa-space-2);
+  border: 1px solid var(--swa-color-border-strong);
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-primary);
+  text-decoration: none;
+}
+.swa-order-reorder {
+  text-align: center;
+  padding: var(--swa-space-2);
+  background: var(--swa-color-brand);
+  color: var(--swa-color-brand-foreground);
+  border: none;
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+  cursor: pointer;
+}
+
 /* Subsequent component styles are added in their respective tasks. */
