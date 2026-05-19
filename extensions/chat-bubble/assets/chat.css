@@ -1322,4 +1322,88 @@
   font-weight: var(--swa-weight-medium);
 }
 
+/* ============================================================
+ * Sizing widget
+ * ============================================================ */
+.swa-sizing {
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--swa-space-2);
+}
+.swa-sizing-title {
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-semibold);
+  color: var(--swa-color-text-primary);
+}
+.swa-sizing-steps {
+  display: flex;
+  gap: var(--swa-space-1);
+  margin: 0 0 var(--swa-space-2);
+}
+.swa-sizing-step-dot {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--swa-color-border);
+}
+.swa-sizing-step-dot[data-state="done"] { background: var(--swa-color-brand); }
+.swa-sizing-step-dot[data-state="active"] { background: var(--swa-color-brand); opacity: 0.5; }
+
+.swa-sizing-summary {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+  padding: var(--swa-space-1) 0;
+  border-bottom: 1px solid var(--swa-color-border);
+}
+.swa-sizing-summary strong { color: var(--swa-color-text-primary); font-weight: var(--swa-weight-medium); }
+
+.swa-sizing-question {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-primary);
+}
+.swa-sizing-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--swa-space-2);
+}
+.swa-sizing-chip {
+  padding: 8px 14px;
+  border: 1px solid var(--swa-color-border-strong);
+  border-radius: var(--swa-radius-sm);
+  background: var(--swa-color-bg);
+  font: inherit;
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-primary);
+  cursor: pointer;
+}
+.swa-sizing-chip:hover { background: var(--swa-color-bg-subtle); }
+.swa-sizing-chip[data-selected="true"] {
+  border-color: var(--swa-color-brand);
+  background: var(--swa-color-brand-soft);
+  color: var(--swa-color-info-fg);
+}
+
+.swa-sizing-fallback {
+  font-size: var(--swa-text-xs);
+  color: var(--swa-color-text-tertiary);
+  border-top: 1px solid var(--swa-color-border);
+  padding-top: var(--swa-space-2);
+}
+.swa-sizing-fallback a {
+  color: var(--swa-color-brand);
+  text-decoration: underline;
+}
+
+.swa-sizing-complete {
+  background: var(--swa-color-success-bg);
+  color: var(--swa-color-success-fg);
+  padding: var(--swa-space-2);
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-sm);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
