@@ -1,636 +1,175 @@
-:root {
-    --viewport-height: 100vh;
-  }
+/* ============================================================
+ * Shop AI Chat Widget — design tokens & base styles
+ * Token namespace: --swa-* (shop-widget-assistant)
+ * ============================================================ */
 
+.shop-ai-chat-container {
+  /* ---------- Brand (merchant-overridable) ---------- */
+  --swa-color-brand: #5046E4;
+  --swa-color-brand-hover: #4239C7;
+  --swa-color-brand-soft: #EEEDFC;
+  --swa-color-brand-foreground: #FFFFFF;
+
+  /* ---------- Neutral palette (light) ---------- */
+  --swa-color-bg: #FFFFFF;
+  --swa-color-bg-subtle: #F4F4F5;
+  --swa-color-bg-elevated: #FAFAFA;
+  --swa-color-text-primary: #18181B;
+  --swa-color-text-secondary: #555555;
+  --swa-color-text-tertiary: #888888;
+  --swa-color-border: #E5E5E8;
+  --swa-color-border-strong: #D4D4D8;
+  --swa-color-focus-ring: rgba(80, 70, 228, 0.45);
+
+  /* ---------- Semantic ---------- */
+  --swa-color-success-bg: #F0FDF4;
+  --swa-color-success-fg: #14532D;
+  --swa-color-warning-bg: #FFF7ED;
+  --swa-color-warning-fg: #9A3412;
+  --swa-color-danger-bg: #FEF2F2;
+  --swa-color-danger-fg: #B91C1C;
+  --swa-color-info-bg: #EEEDFC;
+  --swa-color-info-fg: #4239C7;
+
+  /* ---------- Bubbles ---------- */
+  --swa-color-bubble-user-bg: var(--swa-color-brand-soft);
+  --swa-color-bubble-user-text: var(--swa-color-text-primary);
+  --swa-color-bubble-assistant-bg: var(--swa-color-bg-subtle);
+  --swa-color-bubble-assistant-text: var(--swa-color-text-primary);
+
+  /* ---------- Orb palette ---------- */
+  --swa-orb-color-1: #6366F1;
+  --swa-orb-color-2: #8B5CF6;
+  --swa-orb-color-3: #EC4899;
+  --swa-orb-color-4: #3B82F6;
+
+  /* ---------- Typography ---------- */
+  --swa-font-sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --swa-font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --swa-font-display: var(--swa-font-sans);
+
+  --swa-text-xs: 11px;
+  --swa-text-sm: 12px;
+  --swa-text-base: 14px;
+  --swa-text-md: 15px;
+  --swa-text-lg: 17px;
+
+  --swa-weight-regular: 400;
+  --swa-weight-medium: 500;
+  --swa-weight-semibold: 600;
+
+  /* ---------- Spacing ---------- */
+  --swa-space-1: 4px;
+  --swa-space-2: 8px;
+  --swa-space-3: 12px;
+  --swa-space-4: 16px;
+  --swa-space-5: 20px;
+  --swa-space-6: 24px;
+  --swa-space-8: 32px;
+  --swa-space-10: 40px;
+
+  /* ---------- Radius ---------- */
+  --swa-radius-sm: 6px;
+  --swa-radius-md: 10px;
+  --swa-radius-lg: 14px;
+  --swa-radius-xl: 20px;
+  --swa-radius-full: 9999px;
+
+  /* ---------- Shadow ---------- */
+  --swa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --swa-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --swa-shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.12);
+  --swa-shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.18);
+
+  /* ---------- Motion ---------- */
+  --swa-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --swa-ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --swa-duration-fast: 120ms;
+  --swa-duration-base: 200ms;
+  --swa-duration-slow: 320ms;
+
+  /* ---------- Z-index ---------- */
+  --swa-z-launcher: 2147483000;
+  --swa-z-window: 2147483001;
+  --swa-z-modal: 2147483010;
+
+  /* ---------- Viewport helper (set by JS for mobile) ---------- */
+  --swa-viewport-height: 100vh;
+
+  /* ---------- Base ---------- */
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: var(--swa-z-launcher);
+  font-family: var(--swa-font-sans);
+  font-size: var(--swa-text-base);
+  color: var(--swa-color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+ * Dark mode (auto — honors prefers-color-scheme)
+ * ============================================================ */
+@media (prefers-color-scheme: dark) {
   .shop-ai-chat-container {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 9999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --swa-color-bg: #0F0F11;
+    --swa-color-bg-subtle: #1B1B1E;
+    --swa-color-bg-elevated: #17171A;
+    --swa-color-text-primary: #F2F2F4;
+    --swa-color-text-secondary: #B5B5BB;
+    --swa-color-text-tertiary: #7F7F87;
+    --swa-color-border: #2A2A2E;
+    --swa-color-border-strong: #3F3F46;
   }
+}
 
-  .shop-ai-chat-bubble {
-    width: 60px;
-    height: 60px;
-    background-color: #5046e4;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    transition: transform 0.3s ease;
+/* ============================================================
+ * Reduced motion
+ * ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  .shop-ai-chat-container *,
+  .shop-ai-chat-container *::before,
+  .shop-ai-chat-container *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  
-  @media (max-width: 480px) {
-    .shop-ai-chat-bubble {
-      width: 50px;
-      height: 50px;
-    }
-    
-    .shop-ai-chat-bubble svg {
-      width: 25px;
-      height: 25px;
-    }
-  }
+}
 
-  .shop-ai-chat-bubble:hover {
-    transform: scale(1.05);
-  }
+/* ============================================================
+ * Orb — animated nebula
+ * ============================================================ */
+.swa-orb {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 30% 30%, #FFFFFF 0%, transparent 40%),
+    radial-gradient(circle at 70% 70%, var(--swa-orb-color-3) 0%, transparent 50%),
+    radial-gradient(circle at 30% 70%, var(--swa-orb-color-4) 0%, transparent 50%),
+    linear-gradient(135deg, var(--swa-orb-color-1), var(--swa-orb-color-2));
+  background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
+  animation: swa-orb-shift 8s ease infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+}
 
-  .shop-ai-chat-bubble svg {
-    width: 30px;
-    height: 30px;
-    color: white;
-  }
+.swa-orb-paused {
+  animation-play-state: paused;
+}
 
-  .shop-ai-chat-window {
-    position: absolute;
-    bottom: 80px;
-    right: 0;
-    width: 90vw;
-    max-width: 450px;
-    height: 70vh;
-    height: calc(var(--viewport-height, 100vh) * 0.7);
-    max-height: 650px;
-    min-height: 350px;
-    background-color: white;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(20px);
-    transition: opacity 0.3s ease, transform 0.3s ease;
-  }
-  
-  /* Responsive adjustments for smaller screens */
-  @media (max-width: 480px) {
-    .shop-ai-chat-window {
-      position: fixed;
-      width: 100vw;
-      height: 100vh;
-      height: calc(var(--viewport-height, 100vh));
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      max-width: none;
-      min-height: 100vh;
-      min-height: calc(var(--viewport-height, 100vh));
-      border-radius: 0;
-    }
+.swa-orb-sparkle {
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  font-size: 0.55em;
+  pointer-events: none;
+  user-select: none;
+}
 
-    .shop-ai-chat-container {
-      bottom: 10px;
-      right: 10px;
-    }
+@keyframes swa-orb-shift {
+  0%, 100% { background-position: 0% 0%, 100% 100%, 0% 100%, 0% 0%; }
+  50%      { background-position: 100% 100%, 0% 0%, 100% 0%, 0% 0%; }
+}
 
-    .shop-ai-message {
-      max-width: 90%;
-    }
-    
-    /* Prevent scrolling on the main page when chat is open */
-    body.shop-ai-chat-open {
-      overflow: hidden;
-      position: fixed;
-      width: 100%;
-      height: 100%;
-    }
-    
-    .shop-ai-chat-header {
-      padding: 12px 16px;
-      border-radius: 0;
-    }
-  }
-
-  .shop-ai-chat-window.active {
-    opacity: 1;
-    pointer-events: all;
-    transform: translateY(0);
-  }
-  
-  @media (max-width: 480px) {
-    .shop-ai-chat-window {
-      transform: translateY(100%);
-      z-index: 999999;
-      transition: transform 0.4s ease, opacity 0.3s ease;
-    }
-    
-    .shop-ai-chat-window.active {
-      transform: translateY(0);
-    }
-    
-    .shop-ai-chat-bubble {
-      z-index: 1000000;
-      position: relative;
-    }
-  }
-
-  .shop-ai-chat-header {
-    padding: 16px;
-    background-color: #5046e4;
-    color: white;
-    font-weight: 600;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .shop-ai-chat-close {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    font-size: 20px;
-    padding: 0;
-    line-height: 1;
-  }
-
-  .shop-ai-chat-messages {
-    flex: 1;
-    padding: 16px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-  }
-
-  .shop-ai-message {
-    max-width: 80%;
-    padding: 12px 16px;
-    border-radius: 18px;
-    font-size: 14px;
-    line-height: 1.4;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-  }
-  
-  @media (max-width: 480px) {
-    .shop-ai-chat-messages {
-      padding: 12px 10px;
-    }
-    
-    .shop-ai-message {
-      font-size: 15px;
-      padding: 10px 14px;
-    }
-  }
-
-  .shop-ai-message.assistant {
-    align-self: flex-start;
-    background-color: #f1f1f1;
-    border-bottom-left-radius: 4px;
-  }
-
-  .shop-ai-message.assistant a {
-    color: #5046e4;
-    text-decoration: underline;
-    font-weight: 500;
-    word-break: break-word;
-  }
-
-  .shop-ai-message.assistant a:hover {
-    opacity: 0.8;
-  }
-  
-  @media (max-width: 480px) {
-    .shop-ai-message.assistant a,
-    .shop-ai-message.user a {
-      display: inline-block;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-  }
-  
-  /* List styling for assistant messages */
-  .shop-ai-message.assistant ul,
-  .shop-ai-message.assistant ol {
-    margin: 8px 0;
-    padding-left: 24px;
-  }
-  
-  .shop-ai-message.assistant li {
-    margin-bottom: 6px;
-  }
-  
-  .shop-ai-message.assistant li:last-child {
-    margin-bottom: 0;
-  }
-  
-  /* Nested list styling */
-  .shop-ai-message.assistant li > ul,
-  .shop-ai-message.assistant li > ol {
-    margin-top: 6px;
-  }
-  
-  /* Paragraph styling */
-  .shop-ai-message.assistant p {
-    margin: 0 0 10px 0;
-  }
-  
-  .shop-ai-message.assistant p:last-child {
-    margin-bottom: 0;
-  }
-  
-  /* Bold text styling */
-  .shop-ai-message.assistant strong {
-    font-weight: 600;
-  }
-
-  .shop-ai-message.assistant .shop-ai-heading {
-    display: block;
-    font-weight: 700;
-    font-size: 0.95em;
-    margin: 8px 0 4px 0;
-    color: #1a1a1a;
-  }
-
-  .shop-ai-message.assistant .shop-ai-heading-main {
-    font-size: 1.05em;
-    border-bottom: 1px solid #e5e5e5;
-    padding-bottom: 4px;
-    margin-bottom: 6px;
-  }
-
-  .shop-ai-inline-image {
-    display: block;
-    max-width: 140px;
-    max-height: 140px;
-    border-radius: 8px;
-    margin: 6px 0;
-    object-fit: cover;
-    border: 1px solid #e5e5e5;
-  }
-
-  .shop-ai-message.user {
-    align-self: flex-end;
-    background-color: #5046e4;
-    color: white;
-    border-bottom-right-radius: 4px;
-  }
-  
-  .shop-ai-message.user a {
-    color: white;
-    text-decoration: underline;
-    font-weight: 500;
-  }
-
-  .shop-ai-message.tool-use {
-    align-self: flex-start;
-    background-color: #f5f5f5 !important;
-    color: #000000 !important;
-    border: 1px solid #ddd;
-    border-bottom-left-radius: 4px;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    font-size: 13px;
-    font-weight: 400;
-    max-width: 80%;
-  }
-
-  .shop-ai-tool-header {
-    cursor: pointer;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-  }
-
-  .shop-ai-tool-header:hover {
-    opacity: 0.8;
-  }
-
-  .shop-ai-tool-text {
-    flex: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .shop-ai-tool-toggle {
-    font-size: 12px;
-    color: #666;
-    user-select: none;
-    flex-shrink: 0;
-    margin-left: 8px;
-  }
-
-  .shop-ai-tool-args {
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid #ddd;
-    font-size: 12px;
-    color: #333;
-    word-break: break-all;
-    display: none;
-  }
-
-  .shop-ai-tool-args.expanded {
-    display: block;
-  }
-
-  .shop-ai-chat-input {
-    border-top: 1px solid #e9e9e9;
-    padding: 16px;
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .shop-ai-chat-input input {
-    flex: 1;
-    padding: 12px 16px;
-    border: 1px solid #e9e9e9;
-    border-radius: 24px;
-    font-size: 14px;
-    outline: none;
-    min-height: 24px;
-  }
-  
-  @media (max-width: 480px) {
-    .shop-ai-chat-input {
-      padding: 12px 10px;
-    }
-    
-    .shop-ai-chat-input input {
-      padding: 10px 14px;
-      font-size: 16px; /* Better for mobile input */
-    }
-  }
-
-  .shop-ai-chat-input input:focus {
-    border-color: #5046e4;
-  }
-
-  .shop-ai-chat-send {
-    background-color: #5046e4;
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-  }
-
-  .shop-ai-typing-indicator {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 8px 16px;
-    background-color: #f1f1f1;
-    border-radius: 18px;
-    border-bottom-left-radius: 4px;
-    align-self: flex-start;
-    font-size: 14px;
-  }
-
-  .shop-ai-typing-indicator span {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background-color: #606060;
-    display: inline-block;
-    animation: typing 1.4s infinite both;
-  }
-
-  .shop-ai-typing-indicator span:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-
-  .shop-ai-typing-indicator span:nth-child(3) {
-    animation-delay: 0.4s;
-  }
-
-  /* Authentication link styles */
-.shop-auth-trigger {
-    color: #5046e4;
-    text-decoration: underline;
-    font-weight: 500;
-    cursor: pointer;
-  }
-
-  .shop-auth-trigger:hover {
-    opacity: 0.8;
-  }
-
-  /* Product Section Styling */
-  .shop-ai-product-section {
-    display: flex;
-    flex-direction: column;
-    margin: 15px 0;
-    width: 100%;
-    border-top: 1px solid #eaeaea;
-    border-bottom: 1px solid #eaeaea;
-    padding: 10px 0;
-  }
-  
-  /* Product Header Styling */
-  .shop-ai-product-header {
-    padding: 0 0 10px 5px;
-    margin-bottom: 10px;
-  }
-  
-  .shop-ai-product-header h4 {
-    font-size: 15px;
-    font-weight: 600;
-    color: #333;
-    margin: 0;
-  }
-  
-  /* Product Grid Styling */
-  .shop-ai-product-grid {
-    display: flex;
-    flex-direction: row;
-    gap: 12px;
-    overflow-x: auto;
-    padding: 5px 0;
-    scrollbar-width: thin;
-    width: 100%;
-    min-height: 220px;
-    background-color: transparent;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  /* Hide scrollbar in webkit browsers */
-  .shop-ai-product-grid::-webkit-scrollbar {
-    height: 6px;
-  }
-  
-  .shop-ai-product-grid::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 3px;
-  }
-  
-  /* Product Card Styling */
-  .shop-ai-product-card {
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
-    min-width: 180px;
-    max-width: 180px;
-    overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-    flex-shrink: 0;
-    display: block;
-    border: 1px solid #eaeaea;
-    position: relative;
-  }
-  
-  .shop-ai-product-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  }
-  
-  /* Product Image Styling */
-  .shop-ai-product-image {
-    height: 140px;
-    width: 100%;
-    overflow: hidden;
-    background: #f7f7f7;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  
-  .shop-ai-product-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  
-  /* Product Info Styling */
-  .shop-ai-product-info {
-    padding: 10px;
-  }
-  
-  .shop-ai-product-title {
-    margin: 0 0 5px 0;
-    font-size: 14px;
-    line-height: 1.3;
-    font-weight: 500;
-    color: #333;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  
-  .shop-ai-product-price {
-    margin: 0 0 10px 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: #5046e4;
-  }
-  
-  /* Add to Cart Button Styling */
-  .shop-ai-add-to-cart {
-    width: 100%;
-    padding: 8px 0;
-    background-color: #5046e4;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  
-  .shop-ai-add-to-cart:hover {
-    background-color: #3f36c0;
-  }
-  
-  /* Responsive adjustments for small screens */
-  @media (max-width: 480px) {
-    .shop-ai-product-grid {
-      flex-direction: column;
-      padding: 5px;
-      max-height: 60vh;
-      overflow-y: auto;
-      min-height: auto;
-    }
-    
-    .shop-ai-product-card {
-      min-width: 100%;
-      max-width: 100%;
-      display: flex;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    
-    .shop-ai-product-image {
-      width: 80px;
-      height: 80px;
-      flex-shrink: 0;
-    }
-    
-    .shop-ai-product-info {
-      flex: 1;
-      padding: 5px 10px;
-    }
-    
-    .shop-ai-product-title {
-      white-space: normal;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    
-    .shop-ai-add-to-cart {
-      padding: 6px 0;
-      font-size: 12px;
-    }
-    
-    .shop-ai-product-section {
-      margin: 10px 0;
-      padding: 5px 0;
-    }
-  }
-  
-  /* Even smaller screens */
-  @media (max-width: 380px) {
-    .shop-ai-chat-input input {
-      padding: 8px 12px;
-    }
-    
-    .shop-ai-chat-send {
-      width: 36px;
-      height: 36px;
-    }
-    
-    .shop-ai-message {
-      max-width: 95%;
-      font-size: 14px;
-      padding: 10px 12px;
-    }
-    
-    .shop-ai-chat-header {
-      padding: 10px;
-    }
-  }
-  
-  @keyframes typing {
-    0% {
-      opacity: 0.4;
-      transform: scale(1);
-    }
-    50% {
-      opacity: 1;
-      transform: scale(1.2);
-    }
-    100% {
-      opacity: 0.4;
-      transform: scale(1);
-    }
-  }
+/* Subsequent component styles are added in their respective tasks. */
