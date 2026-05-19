@@ -1283,4 +1283,43 @@
   cursor: pointer;
 }
 
+/* ============================================================
+ * Auth prompt
+ * ============================================================ */
+.swa-auth {
+  background: var(--swa-color-bg);
+  border: 1px solid var(--swa-color-border);
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-3);
+  text-align: center;
+}
+.swa-auth-title {
+  font-size: var(--swa-text-md);
+  font-weight: var(--swa-weight-medium);
+  margin-bottom: var(--swa-space-1);
+}
+.swa-auth-sub {
+  font-size: var(--swa-text-sm);
+  color: var(--swa-color-text-secondary);
+  margin-bottom: var(--swa-space-3);
+}
+.swa-auth-button {
+  background: var(--swa-color-brand);
+  color: var(--swa-color-brand-foreground);
+  border: none;
+  border-radius: var(--swa-radius-md);
+  padding: var(--swa-space-2) var(--swa-space-4);
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+  cursor: pointer;
+}
+.swa-auth-success {
+  background: var(--swa-color-success-bg);
+  color: var(--swa-color-success-fg);
+  padding: var(--swa-space-2);
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-sm);
+  font-weight: var(--swa-weight-medium);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
