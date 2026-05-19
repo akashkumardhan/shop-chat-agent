@@ -173,12 +173,43 @@
 }
 
 /* ============================================================
- * Stub launcher (temporary — replaced in Task 7)
+ * Launcher
  * ============================================================ */
-.swa-stub-launcher {
-  box-shadow: var(--swa-shadow-md);
+.swa-launcher {
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   cursor: pointer;
+  box-shadow: var(--swa-shadow-md);
+  border: none;
+  padding: 0;
+  background: transparent;
+  transition: transform var(--swa-duration-base) var(--swa-ease-standard),
+              box-shadow var(--swa-duration-base) var(--swa-ease-standard);
+  animation: swa-launcher-float 4s ease-in-out infinite;
 }
+.swa-launcher:hover {
+  transform: scale(1.05);
+  box-shadow: var(--swa-shadow-lg);
+}
+.swa-launcher:active {
+  transform: scale(0.95);
+}
+.swa-launcher:focus-visible {
+  outline: 3px solid var(--swa-color-focus-ring);
+  outline-offset: 2px;
+}
+
+@keyframes swa-launcher-float {
+  0%, 100% { translate: 0 0; }
+  50%      { translate: 0 -0.5px; }
+}
+
+@media (max-width: 480px) {
+  .swa-launcher { width: 56px; height: 56px; }
+}
+
+/* Hide the temporary stub from Task 5 once ui-launcher takes over */
+.swa-stub-launcher { display: none; }
 
 /* Subsequent component styles are added in their respective tasks. */
