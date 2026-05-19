@@ -1,10 +1,7 @@
 import { el } from './dom.js';
 import { createTurnNode } from './ui-turn.js';
 
-/**
- * Stream — subscribes to conversation, renders turns in order.
- */
-export function createStream() {
+export function createStream({ turnCtx = {} } = {}) {
   const welcomeSlot = el('div', { class: 'swa-stream-welcome-slot' });
   const turnsWrap = el('div', { class: 'swa-stream-turns' });
   const node = el('div', {
@@ -26,7 +23,7 @@ export function createStream() {
       const turns = conv.getTurns();
       for (const t of turns) {
         if (!turnNodes.has(t.id)) {
-          const ctl = createTurnNode(t);
+          const ctl = createTurnNode(t, turnCtx);
           turnNodes.set(t.id, ctl);
           turnsWrap.appendChild(ctl.node);
         } else {

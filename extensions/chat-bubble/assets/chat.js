@@ -62,7 +62,30 @@ function init() {
   const launcherCtl = createLauncher({ state });
   const window_ = createWindow({ state, launcher: launcherCtl.node });
   const header = createHeader({ state });
-  const stream = createStream();
+  const stream = createStream({
+    turnCtx: {
+      onATCSuccess: (cart) => {
+        if (currentAssistantTurnId) {
+          conversation.appendBlock(currentAssistantTurnId, { type: 'cart_summary', cart });
+        }
+      },
+      onSaveCartSubmit: ({ email, sms }) => {
+        console.log('[swa] save cart for', email, sms);
+        return Promise.resolve();
+      },
+      onReorder: async (orderBlock) => {
+        console.log('[swa] reorder requested for order', orderBlock.orderNumber);
+      },
+      onSaveForLater: () => {
+        if (currentAssistantTurnId) {
+          conversation.appendBlock(currentAssistantTurnId, { type: 'save_cart_card' });
+        }
+      },
+      onAuthSuccess: () => {
+        console.log('[swa] auth success — originating intent should resume in Plan 4');
+      },
+    },
+  });
   const quickReplies = createQuickReplies({
     onSelect: (chip) => {
       sendMessage(chip.label, { intent: chip.intent });
