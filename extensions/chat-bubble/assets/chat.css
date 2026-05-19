@@ -526,4 +526,62 @@
   margin-bottom: var(--swa-space-1);
 }
 
+/* ============================================================
+ * Turns and bubbles
+ * ============================================================ */
+.swa-turn {
+  display: flex;
+  gap: var(--swa-space-2);
+  align-items: flex-start;
+  margin-bottom: var(--swa-space-3);
+}
+.swa-turn-user {
+  justify-content: flex-end;
+}
+.swa-turn-assistant .swa-turn-blocks {
+  max-width: 88%;
+}
+.swa-turn-user .swa-turn-blocks {
+  max-width: 80%;
+}
+.swa-turn-avatar {
+  flex-shrink: 0;
+}
+.swa-turn-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--swa-space-2);
+}
+
+.swa-bubble {
+  padding: var(--swa-space-2) var(--swa-space-3);
+  font-size: var(--swa-text-base);
+  line-height: 1.45;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+.swa-bubble-user {
+  background: var(--swa-color-bubble-user-bg);
+  color: var(--swa-color-bubble-user-text);
+  border-radius: var(--swa-radius-md) var(--swa-radius-md) var(--swa-radius-sm) var(--swa-radius-md);
+}
+.swa-bubble-assistant {
+  background: var(--swa-color-bubble-assistant-bg);
+  color: var(--swa-color-bubble-assistant-text);
+  border-radius: var(--swa-radius-md) var(--swa-radius-md) var(--swa-radius-md) var(--swa-radius-sm);
+}
+
+.swa-bubble p { margin: 0 0 var(--swa-space-2); }
+.swa-bubble p:last-child { margin-bottom: 0; }
+.swa-bubble ul, .swa-bubble ol { margin: var(--swa-space-2) 0; padding-left: var(--swa-space-5); }
+.swa-bubble li { margin-bottom: var(--swa-space-1); }
+.swa-bubble a { color: var(--swa-color-brand); text-decoration: underline; }
+.swa-bubble code {
+  font-family: var(--swa-font-mono);
+  font-size: 0.9em;
+  background: rgba(0,0,0,0.06);
+  padding: 1px 4px;
+  border-radius: var(--swa-radius-sm);
+}
+
 /* Subsequent component styles are added in their respective tasks. */
