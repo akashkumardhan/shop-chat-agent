@@ -17,13 +17,16 @@
     "prisma": "prisma",
     "graphql-codegen": "graphql-codegen",
     "vite": "vite",
-    "typecheck": "react-router typegen && tsc --noEmit"
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "type": "module",
   "engines": {
     "node": ">=20.10"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
     "@prisma/client": "^6.2.1",
     "@react-router/dev": "^7.9.1",
     "@react-router/fs-routes": "^7.9.1",
@@ -32,14 +35,13 @@
     "@shopify/app-bridge-react": "^4.1.6",
     "@shopify/shopify-app-react-router": "^1.0.0",
     "@shopify/shopify-app-session-storage-prisma": "^7.0.0",
+    "dotenv": "^16.3.1",
     "isbot": "^5.1.0",
     "prisma": "^6.2.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router": "^7.9.1",
-    "vite-tsconfig-paths": "^5.0.1",
-    "@anthropic-ai/sdk": "^0.40.0",
-    "dotenv": "^16.3.1"
+    "vite-tsconfig-paths": "^5.0.1"
   },
   "devDependencies": {
     "@shopify/api-codegen-preset": "^1.1.1",
@@ -56,9 +58,11 @@
     "eslint-plugin-jsx-a11y": "^6.7.1",
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
+    "happy-dom": "^15.11.7",
     "prettier": "^3.2.4",
     "typescript": "^5.2.2",
-    "vite": "^6.2.2"
+    "vite": "^6.2.2",
+    "vitest": "^2.1.9"
   },
   "workspaces": [
     "extensions/*"
