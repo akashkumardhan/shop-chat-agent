@@ -94,19 +94,28 @@ export function createToolService() {
    * @returns {Object} Formatted product data
    */
   const formatProductData = (product) => {
-    const price = product.price_range
-      ? `${product.price_range.currency} ${product.price_range.min}`
-      : (product.variants && product.variants.length > 0
-        ? `${product.variants[0].currency} ${product.variants[0].price}`
-        : 'Price not available');
+    // Parse numeric price and currency for the UI card component
+    let price = 0;
+    let currency = 'USD';
+    if (product.price_range) {
+      price = parseFloat(product.price_range.min) || 0;
+      currency = product.price_range.currency || 'USD';
+    } else if (product.variants && product.variants.length > 0) {
+      price = parseFloat(product.variants[0].price) || 0;
+      currency = product.variants[0].currency || 'USD';
+    }
+
+    const firstVariant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
 
     return {
       id: product.product_id || `product-${Math.random().toString(36).substring(7)}`,
       title: product.title || 'Product',
-      price: price,
-      image_url: product.image_url || '',
-      description: product.description || '',
-      url: product.url || ''
+      image: product.image_url || '',
+      price,
+      currency,
+      url: product.url || '',
+      variantId: firstVariant?.id || null,
+      status: product.available === false ? 'sold_out' : 'in_stock',
     };
   };
 

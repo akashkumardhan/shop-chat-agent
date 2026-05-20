@@ -219,8 +219,8 @@
   position: absolute;
   bottom: 80px;
   right: 0;
-  width: 420px;
-  height: 640px;
+  width: 520px;
+  height: 700px;
   max-height: calc(var(--swa-viewport-height, 100vh) - 120px);
   background: var(--swa-color-bg);
   border-radius: var(--swa-radius-xl);
@@ -244,7 +244,7 @@
 }
 
 @media (max-width: 768px) and (min-width: 481px) {
-  .swa-window { width: 380px; height: 600px; }
+  .swa-window { width: 460px; height: 640px; }
 }
 
 @media (max-width: 480px) {
@@ -273,6 +273,18 @@
     position: fixed;
     width: 100%;
   }
+}
+
+/* Window slot layout — stream must be constrained so composer stays visible */
+.swa-window-stream-slot {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.swa-window-composer-slot,
+.swa-window-dock-slot,
+.swa-window-footer-slot {
+  flex-shrink: 0;
 }
 
 /* ============================================================
@@ -439,6 +451,17 @@
   padding: var(--swa-space-4);
   scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+.swa-stream-turns {
+  margin-top: auto;
+}
+.swa-stream-welcome-slot:not(:empty) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 .swa-stream::-webkit-scrollbar { width: 8px; }
 .swa-stream::-webkit-scrollbar-thumb {
@@ -539,7 +562,7 @@
   justify-content: flex-end;
 }
 .swa-turn-assistant .swa-turn-blocks {
-  max-width: 88%;
+  max-width: 92%;
 }
 .swa-turn-user .swa-turn-blocks {
   max-width: 80%;
@@ -585,6 +608,30 @@
 }
 
 /* ============================================================
+ * Typing indicator (three bouncing dots)
+ * ============================================================ */
+.swa-typing-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 40px;
+}
+.swa-typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--swa-color-text-tertiary);
+  animation: swa-typing-bounce 1.4s ease-in-out infinite both;
+}
+.swa-typing-dot:nth-child(1) { animation-delay: 0s; }
+.swa-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.swa-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes swa-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* ============================================================
  * Tool-use shimmer pill
  * ============================================================ */
 .swa-tool-use {
@@ -607,11 +654,7 @@
   align-self: flex-start;
 }
 .swa-tool-use-icon { font-size: 0.9em; }
-.swa-tool-use-params {
-  font-family: var(--swa-font-mono);
-  font-size: 0.9em;
-  color: var(--swa-color-text-primary);
-}
+.swa-tool-use-params { display: none; }
 @keyframes swa-tool-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -909,8 +952,8 @@
 }
 .swa-product-carousel::-webkit-scrollbar { display: none; }
 .swa-product-carousel .swa-product-mini {
-  min-width: 170px;
-  max-width: 170px;
+  min-width: 155px;
+  max-width: 155px;
   scroll-snap-align: start;
   background: var(--swa-color-bg);
   border: 1px solid var(--swa-color-border);
@@ -1515,20 +1558,28 @@
 .swa-new-messages-pill {
   position: sticky;
   bottom: var(--swa-space-3);
-  margin: 0 auto var(--swa-space-2);
+  margin: var(--swa-space-2) auto 0;
+  align-self: center;
   display: none;
-  width: max-content;
-  background: var(--swa-color-text-primary);
-  color: var(--swa-color-bg);
-  border: none;
-  border-radius: var(--swa-radius-full);
-  padding: 6px 14px;
-  font-size: var(--swa-text-sm);
+  width: 36px;
+  height: 36px;
+  background: var(--swa-color-bg);
+  color: var(--swa-color-text-secondary);
+  border: 1px solid var(--swa-color-border);
+  border-radius: 50%;
+  padding: 0;
   cursor: pointer;
   box-shadow: var(--swa-shadow-md);
   z-index: 1;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--swa-duration-fast), color var(--swa-duration-fast);
 }
-.swa-new-messages-pill[data-visible="true"] { display: inline-flex; align-items: center; gap: 6px; }
+.swa-new-messages-pill:hover {
+  background: var(--swa-color-bg-subtle);
+  color: var(--swa-color-text-primary);
+}
+.swa-new-messages-pill[data-visible="true"] { display: flex; }
 
 /* ============================================================
  * Resume card / banners / offline bar

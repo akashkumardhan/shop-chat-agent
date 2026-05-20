@@ -8,8 +8,10 @@ export function createStream({ turnCtx = {} } = {}) {
   const newMsgPill = el('button', {
     class: 'swa-new-messages-pill',
     type: 'button',
+    'aria-label': 'Scroll to bottom',
     dataset: { visible: 'false' },
-  }, '↓ New messages');
+  });
+  newMsgPill.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4,6 8,10 12,6"/></svg>';
   const node = el('div', {
     class: 'swa-stream',
     role: 'log',

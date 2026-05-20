@@ -9,10 +9,11 @@
     shopName: {{ shop.name | json }},
     brandColor: {{ block.settings.chat_bubble_color | json }},
     welcomeMessage: {{ block.settings.welcome_message | json }},
-    promptType: {{ block.settings.system_prompt | json }}
+    promptType: {{ block.settings.system_prompt | json }},
+    apiBase: {{ app.url | json }}
   };
 </script>
-<script type="module" src="{{ 'chat.js' | asset_url }}"></script>
+<script src="{{ 'chat.js' | asset_url }}" defer></script>
 
 {% schema %}
 {

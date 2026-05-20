@@ -13,7 +13,22 @@ export function createTurnNode(turn, ctx = {}) {
 
   function renderBlocks() {
     blocksWrap.innerHTML = '';
-    for (const block of turn.blocks) {
+    if (turn.role === 'assistant' && turn.blocks.length === 0) {
+      blocksWrap.appendChild(
+        el('div', { class: 'swa-bubble swa-bubble-assistant swa-typing-indicator' },
+          el('span', { class: 'swa-typing-dot' }),
+          el('span', { class: 'swa-typing-dot' }),
+          el('span', { class: 'swa-typing-dot' }),
+        )
+      );
+      return;
+    }
+    // A tool_use block whose dots should disappear once the AI has responded
+    // after it — hide any tool_use that is followed by a text block.
+    const lastTextIdx = turn.blocks.reduce((acc, b, i) => b.type === 'text' ? i : acc, -1);
+    for (let i = 0; i < turn.blocks.length; i++) {
+      const block = turn.blocks[i];
+      if (block.type === 'tool_use' && i < lastTextIdx) continue;
       blocksWrap.appendChild(renderBlock(block, turn.role, ctx));
     }
   }

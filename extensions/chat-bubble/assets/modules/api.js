@@ -2,8 +2,9 @@
  * api — single source of truth for backend calls.
  */
 
-const CHAT_URL = '/chat';
-const WELCOME_URL = '/welcome';
+const BASE = (window.shopAIChatConfig && window.shopAIChatConfig.apiBase) || 'https://localhost:3458';
+const CHAT_URL = `${BASE}/chat`;
+const WELCOME_URL = `${BASE}/welcome`;
 
 /**
  * streamChat — opens an SSE connection to /chat.

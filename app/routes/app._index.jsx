@@ -1,4 +1,18 @@
+import { useLoaderData } from "react-router";
+import { authenticate } from "../shopify.server";
+
+const EXTENSION_UUID = "770e3d9e-3fe9-98c2-0c3d-fe71ee70a7db5cc97b39";
+const BLOCK_NAME = "chat-interface";
+
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const themeEditorUrl = `https://${session.shop}/admin/themes/current/editor?context=apps&activateAppId=${EXTENSION_UUID}/${BLOCK_NAME}`;
+  return { themeEditorUrl };
+};
+
 export default function Index() {
+  const { themeEditorUrl } = useLoaderData();
+
   return (
     <s-page>
       <ui-title-bar title="Shop chat agent reference app" />
@@ -47,7 +61,16 @@ export default function Index() {
       </s-section>
 
       <s-section heading="Next steps" slot="aside">
-        <s-text>Enable the theme extension in your theme editor.</s-text>
+        <s-stack gap="base">
+          <s-paragraph>
+            The chat widget is a theme app block. After installing the app, you
+            must add the block to your active theme so it appears on the
+            storefront.
+          </s-paragraph>
+          <s-link href={themeEditorUrl} target="_blank">
+            Enable chat widget in Theme Editor →
+          </s-link>
+        </s-stack>
       </s-section>
     </s-page>
   );
