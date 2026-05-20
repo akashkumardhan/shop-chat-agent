@@ -5,6 +5,8 @@ import { createAutoScroll } from './auto-scroll.js';
 export function createStream({ turnCtx = {} } = {}) {
   const welcomeSlot = el('div', { class: 'swa-stream-welcome-slot' });
   const turnsWrap = el('div', { class: 'swa-stream-turns' });
+  // Pill lives outside the scrollable node so it always hovers at the
+  // bottom of the visible stream area (absolute in the stream-slot wrapper).
   const newMsgPill = el('button', {
     class: 'swa-new-messages-pill',
     type: 'button',
@@ -17,7 +19,7 @@ export function createStream({ turnCtx = {} } = {}) {
     role: 'log',
     'aria-live': 'polite',
     'aria-relevant': 'additions text',
-  }, welcomeSlot, turnsWrap, newMsgPill);
+  }, welcomeSlot, turnsWrap);
 
   const auto = createAutoScroll(node);
   newMsgPill.addEventListener('click', () => {
@@ -52,5 +54,5 @@ export function createStream({ turnCtx = {} } = {}) {
     render();
   }
 
-  return { node, setWelcome, bindConversation };
+  return { node, pillNode: newMsgPill, setWelcome, bindConversation };
 }

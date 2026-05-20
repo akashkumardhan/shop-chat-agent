@@ -110,6 +110,7 @@ function init() {
 
   window_.headerSlot.appendChild(header);
   window_.streamSlot.appendChild(stream.node);
+  window_.streamSlot.appendChild(stream.pillNode);
   window_.dockSlot.appendChild(quickReplies.node);
   window_.dockSlot.appendChild(composer.pendingImageNode);
   window_.composerSlot.appendChild(composer.node);

@@ -55,35 +55,55 @@ export function createToolService() {
    */
   const processProductSearchResult = (toolUseResponse) => {
     try {
-      console.log("Processing product search result");
       let products = [];
 
-      if (toolUseResponse.content && toolUseResponse.content.length > 0) {
-        const content = toolUseResponse.content[0].text;
+      if (!toolUseResponse.content || toolUseResponse.content.length === 0) return products;
 
-        try {
-          let responseData;
-          if (typeof content === 'object') {
-            responseData = content;
-          } else if (typeof content === 'string') {
-            responseData = JSON.parse(content);
-          }
+      const rawContent = toolUseResponse.content[0].text;
+      console.log('[tool] FULL raw product search content:', rawContent);
 
-          if (responseData?.products && Array.isArray(responseData.products)) {
-            products = responseData.products
-              .slice(0, AppConfig.tools.maxProductsToDisplay)
-              .map(formatProductData);
+      try {
+        let responseData = typeof rawContent === 'object' ? rawContent : JSON.parse(rawContent);
 
-            console.log(`Found ${products.length} products to display`);
-          }
-        } catch (e) {
-          console.error("Error parsing product data:", e);
+        // Handle flat { products: [...] }
+        let rawProducts = responseData?.products;
+
+        // Handle GraphQL edges format: { data: { products: { edges: [...] } } }
+        if (!rawProducts && responseData?.data?.products?.edges) {
+          rawProducts = responseData.data.products.edges.map(e => e.node);
         }
+
+        // Handle GraphQL nodes format: { data: { products: { nodes: [...] } } }
+        if (!rawProducts && responseData?.data?.products?.nodes) {
+          rawProducts = responseData.data.products.nodes;
+        }
+
+        // Handle top-level edges array
+        if (!rawProducts && responseData?.edges) {
+          rawProducts = responseData.edges.map(e => e.node);
+        }
+
+        // Handle top-level nodes array
+        if (!rawProducts && responseData?.nodes) {
+          rawProducts = responseData.nodes;
+        }
+
+        if (Array.isArray(rawProducts) && rawProducts.length > 0) {
+          console.log('[tool] first raw product:', JSON.stringify(rawProducts[0], null, 2));
+          products = rawProducts
+            .slice(0, AppConfig.tools.maxProductsToDisplay)
+            .map(formatProductData);
+          console.log(`[tool] formatted ${products.length} products:`, JSON.stringify(products[0]));
+        } else {
+          console.warn('[tool] no products array found in response. Keys:', Object.keys(responseData || {}));
+        }
+      } catch (e) {
+        console.error('[tool] error parsing product data:', e.message, '| raw:', String(rawContent).slice(0, 500));
       }
 
       return products;
     } catch (error) {
-      console.error("Error processing product search results:", error);
+      console.error('[tool] processProductSearchResult error:', error);
       return [];
     }
   };
@@ -94,28 +114,125 @@ export function createToolService() {
    * @returns {Object} Formatted product data
    */
   const formatProductData = (product) => {
-    // Parse numeric price and currency for the UI card component
+    // --- Price ---
+    // UCP format: price_range.min.amount / price_range.min.currency
+    // GraphQL format: priceRange.minVariantPrice.amount / .currencyCode
+    // Flat variant: variants[0].price.amount or variants[0].price (string)
     let price = 0;
     let currency = 'USD';
-    if (product.price_range) {
-      price = parseFloat(product.price_range.min) || 0;
-      currency = product.price_range.currency || 'USD';
-    } else if (product.variants && product.variants.length > 0) {
-      price = parseFloat(product.variants[0].price) || 0;
-      currency = product.variants[0].currency || 'USD';
+
+    if (product.price_range?.min?.amount !== undefined) {
+      price = parseFloat(product.price_range.min.amount) || 0;
+      currency = product.price_range.min.currency || 'USD';
+    } else if (product.priceRange?.minVariantPrice) {
+      price = parseFloat(product.priceRange.minVariantPrice.amount) || 0;
+      currency = product.priceRange.minVariantPrice.currencyCode || 'USD';
+    } else if (Array.isArray(product.variants) && product.variants[0]) {
+      const v = product.variants[0];
+      if (v.price?.amount !== undefined) {
+        price = parseFloat(v.price.amount) || 0;
+        currency = v.price.currency || v.price.currencyCode || 'USD';
+      } else {
+        price = parseFloat(v.price) || 0;
+        currency = v.currencyCode || v.currency || 'USD';
+      }
+    } else if (product.variants?.edges?.[0]?.node) {
+      const v = product.variants.edges[0].node;
+      price = parseFloat(v.price) || 0;
+      currency = v.currencyCode || v.currency || 'USD';
+    } else if (product.price) {
+      price = parseFloat(product.price) || 0;
+      currency = product.currency || product.currencyCode || 'USD';
     }
 
-    const firstVariant = product.variants && product.variants.length > 0 ? product.variants[0] : null;
+    // --- Image ---
+    // UCP format: media[].url where media[].type === 'image'
+    // GraphQL: featuredImage.url, images.edges[0].node.url
+    let image = '';
+    if (product.image_url) {
+      image = product.image_url;
+    } else if (Array.isArray(product.media)) {
+      const img = product.media.find(m => m.type === 'image');
+      if (img?.url) image = img.url;
+    } else if (product.featuredImage?.url) {
+      image = product.featuredImage.url;
+    } else if (product.featuredImage?.src) {
+      image = product.featuredImage.src;
+    } else if (product.images?.edges?.[0]?.node?.url) {
+      image = product.images.edges[0].node.url;
+    } else if (product.images?.nodes?.[0]?.url) {
+      image = product.images.nodes[0].url;
+    } else if (product.images?.[0]?.src || product.images?.[0]?.url) {
+      image = product.images[0].src || product.images[0].url;
+    } else if (product.image?.src || product.image?.url) {
+      image = product.image.src || product.image.url;
+    }
+
+    // If product has no top-level media, try first variant's media
+    if (!image && Array.isArray(product.variants) && product.variants[0]?.media) {
+      const variantImg = product.variants[0].media.find(m => m.type === 'image');
+      if (variantImg?.url) image = variantImg.url;
+    }
+
+    // --- Variants for picker ---
+    // UCP: variants[].id, variants[].options[0].label, variants[].availability.available, variants[].price.amount
+    let variants = [];
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      const rawVariants = product.variants;
+      const isDefaultOnly = rawVariants.length === 1 &&
+        (rawVariants[0].title === 'Default Title' || rawVariants[0].options?.[0]?.name === 'Title');
+      if (!isDefaultOnly) {
+        variants = rawVariants.map(v => ({
+          id: v.id,
+          label: v.options?.[0]?.label || v.title || v.id,
+          available: v.availability?.available !== false && v.available !== false && v.availableForSale !== false,
+          price: parseFloat(v.price?.amount ?? v.price) || price,
+          currency: v.price?.currency || currency,
+        }));
+      }
+    } else if (product.variants?.edges) {
+      variants = product.variants.edges.map(({ node: v }) => ({
+        id: v.id,
+        label: v.title,
+        available: v.availableForSale !== false,
+        price: parseFloat(v.price) || price,
+        currency,
+      }));
+    }
+
+    // --- Variant ID for ATC (first available) ---
+    let variantId = null;
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      const firstAvail = product.variants.find(v => v.availability?.available !== false) || product.variants[0];
+      variantId = firstAvail?.id || null;
+    } else if (product.variants?.edges?.[0]?.node?.id) {
+      variantId = product.variants.edges[0].node.id;
+    }
+
+    // --- Availability ---
+    // If all variants are unavailable → sold_out
+    let status = 'in_stock';
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
+      const anyAvailable = product.variants.some(v => v.availability?.available !== false);
+      if (!anyAvailable) status = 'sold_out';
+    } else if (product.available === false || product.availableForSale === false) {
+      status = 'sold_out';
+    }
+
+    // --- URL ---
+    const url = product.url || product.onlineStoreUrl ||
+      (product.handle ? `/products/${product.handle}` : '');
 
     return {
-      id: product.product_id || `product-${Math.random().toString(36).substring(7)}`,
+      id: product.id || product.product_id || `product-${Math.random().toString(36).substring(7)}`,
       title: product.title || 'Product',
-      image: product.image_url || '',
+      image,
       price,
       currency,
-      url: product.url || '',
-      variantId: firstVariant?.id || null,
-      status: product.available === false ? 'sold_out' : 'in_stock',
+      url,
+      variantId,
+      variants,
+      status,
     };
   };
 
