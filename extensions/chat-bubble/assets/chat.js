@@ -133,8 +133,15 @@
     const res = await fetch("/cart.js", { headers: JSON_HEADERS });
     return normalizeCart(await res.json());
   }
+  function numericVariantId(id) {
+    if (!id) return id;
+    const str = String(id);
+    const match = str.match(/\/(\d+)$/);
+    return match ? parseInt(match[1], 10) : id;
+  }
   async function addToCart({ variantId, quantity = 1, properties }) {
-    const body = { items: [{ id: variantId, quantity, properties }] };
+    const id = numericVariantId(variantId);
+    const body = { items: [{ id, quantity, ...properties && { properties } }] };
     await postJson("/cart/add.js", body);
     return getCart();
   }
@@ -4778,6 +4785,28 @@ ${text2}</tr>
         turn.blocks.push(block2);
         notify();
       },
+      // Update existing block of matching type in the turn, or append if none exists
+      upsertBlock(turnId, block2) {
+        const turn = turns.find((t) => t.id === turnId);
+        if (!turn) return;
+        const idx = turn.blocks.findIndex((b) => b.type === block2.type);
+        if (idx >= 0) {
+          turn.blocks[idx] = block2;
+        } else {
+          turn.blocks.push(block2);
+        }
+        notify();
+      },
+      // Remove all blocks of a given type from every turn
+      removeBlockType(type) {
+        let changed = false;
+        for (const turn of turns) {
+          const before = turn.blocks.length;
+          turn.blocks = turn.blocks.filter((b) => b.type !== type);
+          if (turn.blocks.length !== before) changed = true;
+        }
+        if (changed) notify();
+      },
       appendTextChunk(turnId, chunk) {
         const turn = turns.find((t) => t.id === turnId);
         if (!turn) return;
@@ -5142,6 +5171,7 @@ ${text2}</tr>
     const stream = createStream({
       turnCtx: {
         onATCSuccess: (cart) => {
+          conversation.removeBlockType("cart_summary");
           if (currentAssistantTurnId) {
             conversation.appendBlock(currentAssistantTurnId, { type: "cart_summary", cart });
           }

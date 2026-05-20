@@ -68,6 +68,8 @@ function init() {
   const stream = createStream({
     turnCtx: {
       onATCSuccess: (cart) => {
+        // Remove any existing cart_summary blocks from previous turns first
+        conversation.removeBlockType('cart_summary');
         if (currentAssistantTurnId) {
           conversation.appendBlock(currentAssistantTurnId, { type: 'cart_summary', cart });
         }

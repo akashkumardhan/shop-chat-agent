@@ -39,6 +39,30 @@ export function createConversation() {
       notify();
     },
 
+    // Update existing block of matching type in the turn, or append if none exists
+    upsertBlock(turnId, block) {
+      const turn = turns.find(t => t.id === turnId);
+      if (!turn) return;
+      const idx = turn.blocks.findIndex(b => b.type === block.type);
+      if (idx >= 0) {
+        turn.blocks[idx] = block;
+      } else {
+        turn.blocks.push(block);
+      }
+      notify();
+    },
+
+    // Remove all blocks of a given type from every turn
+    removeBlockType(type) {
+      let changed = false;
+      for (const turn of turns) {
+        const before = turn.blocks.length;
+        turn.blocks = turn.blocks.filter(b => b.type !== type);
+        if (turn.blocks.length !== before) changed = true;
+      }
+      if (changed) notify();
+    },
+
     appendTextChunk(turnId, chunk) {
       const turn = turns.find(t => t.id === turnId);
       if (!turn) return;

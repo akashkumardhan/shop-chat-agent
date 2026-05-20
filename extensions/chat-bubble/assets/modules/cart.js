@@ -63,8 +63,17 @@ export async function getCart() {
   return normalizeCart(await res.json());
 }
 
+function numericVariantId(id) {
+  if (!id) return id;
+  // Strip GID prefix: "gid://shopify/ProductVariant/12345" → 12345
+  const str = String(id);
+  const match = str.match(/\/(\d+)$/);
+  return match ? parseInt(match[1], 10) : id;
+}
+
 export async function addToCart({ variantId, quantity = 1, properties }) {
-  const body = { items: [{ id: variantId, quantity, properties }] };
+  const id = numericVariantId(variantId);
+  const body = { items: [{ id, quantity, ...(properties && { properties }) }] };
   await postJson('/cart/add.js', body);
   return getCart();
 }
