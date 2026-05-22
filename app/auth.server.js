@@ -3,6 +3,32 @@
  */
 
 /**
+ * Derive the OAuth `redirect_uri` from the current runtime environment.
+ *
+ * Priority:
+ *   1. SHOPIFY_APP_URL  — set by `shopify app dev` to the current tunnel host
+ *                          and pushed to Partner Dashboard via
+ *                          `automatically_update_urls_on_dev`. Following this
+ *                          value means tunnel rotation is zero-touch.
+ *   2. REDIRECT_URL     — legacy / production override (full callback URL).
+ *
+ * The path component is always `/auth/callback` because that's where
+ * `app/routes/auth.callback.jsx` mounts.
+ *
+ * @returns {string|null}
+ */
+export function buildRedirectUri() {
+  const appUrl = process.env.SHOPIFY_APP_URL;
+  if (appUrl) {
+    return `${appUrl.replace(/\/+$/, "")}/auth/callback`;
+  }
+  if (process.env.REDIRECT_URL) {
+    return process.env.REDIRECT_URL;
+  }
+  return null;
+}
+
+/**
  * Generate authorization URL for the customer
  * @param {string} conversationId - The conversation ID to track the auth flow
  * @returns {Promise<Object>} - Object containing the auth URL and conversation ID
@@ -31,8 +57,19 @@ export async function generateAuthUrl(conversationId, shopId) {
   const scope = "customer-account-mcp-api:full";
   const responseType = "code";
 
-  // Use the actual app URL for redirect
-  const redirectUri = process.env.REDIRECT_URL;
+  // Derive redirect_uri from SHOPIFY_APP_URL (set automatically by `shopify app dev`
+  // to the current tunnel host and pushed to Partner Dashboard via
+  // automatically_update_urls_on_dev). Falling back to REDIRECT_URL keeps the
+  // production deploy path working too.
+  //
+  // Why derived: Cloudflare Quick Tunnels rotate their hostname every dev
+  // restart. Hardcoding the URL in .env meant every rotation broke OAuth until
+  // someone manually re-synced four files. Reading from SHOPIFY_APP_URL means
+  // tunnel rotations are zero-touch.
+  const redirectUri = buildRedirectUri();
+  if (!redirectUri) {
+    throw new Error("Cannot build OAuth redirect_uri: neither SHOPIFY_APP_URL nor REDIRECT_URL is set.");
+  }
 
   // Include the conversation ID and shop ID in the state parameter for tracking
   const state = `${conversationId}-${shopId}`;

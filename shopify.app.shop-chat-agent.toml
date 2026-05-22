@@ -37,16 +37,15 @@ redirect_urls = [ "https://adaptive-transportation-watson-wires.trycloudflare.co
 
 # Customer Account OAuth (used by the chat widget's customer sign-in flow).
 #
-# IMPORTANT: Shopify's Partner Dashboard *rejects* localhost / 127.0.0.1 /
-# http:// values here. The Customer Account API requires a publicly-resolvable
-# HTTPS URL. See: https://shopify.dev/docs/storefronts/headless/building-with-the-customer-account-api/authenticate-customers
+# Auto-managed: `automatically_update_urls_on_dev = true` keeps this URL in
+# sync with the current `shopify app dev` tunnel. The runtime callback URL is
+# also derived from SHOPIFY_APP_URL via app/auth.server.js → buildRedirectUri,
+# so this value is what gets pushed to Partner Dashboard on the next deploy.
 #
-# Replace TUNNEL_HOST below with EITHER:
-#   • the Cloudflare Quick Tunnel URL printed when running `shopify app dev`
-#     (default mode, no --use-localhost), e.g. random-words.trycloudflare.com
-#   • a static ngrok / Cloudflare Named Tunnel domain for stable dev
-#   • your production app domain
-#
-# The path MUST be `/auth/callback` (matches app/routes/auth.callback.jsx).
+# CONSTRAINTS:
+#   • The Customer Account API requires HTTPS — no localhost, no 127.0.0.1,
+#     no http://. Use a tunnel (Cloudflare Quick Tunnel from `shopify app dev`
+#     by default; ngrok with a static domain if you want URL stability).
+#   • Path MUST be `/auth/callback` (mounts at app/routes/auth.callback.jsx).
 [customer_authentication]
 redirect_uris = [ "https://adaptive-transportation-watson-wires.trycloudflare.com/auth/callback" ]

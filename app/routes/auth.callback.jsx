@@ -1,4 +1,5 @@
 import { getCodeVerifier, storeCustomerToken, getCustomerAccountUrls } from "../db.server";
+import { buildRedirectUri } from "../auth.server";
 
 /**
  * Handle OAuth callback from Shopify Customer API
@@ -123,7 +124,13 @@ async function exchangeCodeForToken(code, state) {
     throw new Error("SHOPIFY_CLIENT_ID and SHOPIFY_SHOP_ID environment variables are required");
   }
 
-  const redirectUri = process.env.REDIRECT_URL;
+  // Must match the redirect_uri sent during the authorize step. We derive it
+  // the same way (buildRedirectUri preferring SHOPIFY_APP_URL) so both ends
+  // automatically follow tunnel rotation.
+  const redirectUri = buildRedirectUri();
+  if (!redirectUri) {
+    throw new Error("Cannot build redirect_uri for token exchange: SHOPIFY_APP_URL/REDIRECT_URL not set.");
+  }
 
   // Correct token URL format
   const tokenUrl = await getTokenUrl(conversationId);
