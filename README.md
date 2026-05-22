@@ -60,6 +60,41 @@ This repo can be customized. You can:
 
 You can learn how from our [dev docs](https://shopify.dev/docs/apps/build/storefront-mcp).
 
+## Switching LLM providers
+
+The chat agent supports two LLM providers, selected via the `LLM_PROVIDER` environment variable.
+
+| Value | Provider | Default model | API key env var |
+|---|---|---|---|
+| `gemini` (default) | Google Gemini | `gemini-2.5-flash` | `GEMINI_API_KEY` |
+| `claude` | Anthropic Claude | `claude-sonnet-4-20250514` | `CLAUDE_API_KEY` |
+
+### Getting API keys
+
+- **Gemini:** https://aistudio.google.com/app/apikey (free tier: 15 RPM, 1500 req/day on `gemini-2.5-flash`)
+- **Claude:** https://console.anthropic.com (requires paid credits)
+
+### Configuration
+
+Set the relevant key in `.env`:
+
+```
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=<your_key>
+```
+
+Restart `npm run dev` for changes to take effect (env vars are only read at server boot).
+
+### Switching providers manually
+
+Provider switching is supported, but **conversation history is provider-specific** — Claude stores `tool_use`/`tool_result` blocks while Gemini's translation layer expects them to come from Claude's shape. To avoid mid-conversation format mismatches, **wipe existing conversations when switching providers**:
+
+```bash
+sqlite3 prisma/dev.sqlite "DELETE FROM Message; DELETE FROM Conversation;"
+```
+
+Then restart `npm run dev` and start a fresh chat.
+
 ## Deployment
 Follow standard Shopify app deployment procedures as outlined in the [Shopify documentation](https://shopify.dev/docs/apps/deployment/web).
 
