@@ -225,6 +225,11 @@ export async function consumeGeminiStream(geminiStream, callbacks = {}) {
     }
   }
 
+  // Build the full assistant content (text + all tool_use blocks) BEFORE
+  // firing any callback. We need the complete message in hand so onMessage
+  // can store it in conversation history with the tool_use blocks already
+  // present — matching Claude SDK's contract where the message event
+  // fires with the full assistant content before tool execution begins.
   const content = [];
   if (textBuffer) {
     const block = { type: 'text', text: textBuffer };
@@ -232,18 +237,36 @@ export async function consumeGeminiStream(geminiStream, callbacks = {}) {
     onContentBlock?.(block);
   }
   for (const fn of toolCalls) {
-    const block = {
+    content.push({
       type: 'tool_use',
       id: `g_${cryptoRandomUUID()}`,
       name: fn.name,
       input: fn.args || {},
-    };
-    content.push(block);
-    await onToolUse?.(block);
+    });
   }
 
   const finalMessage = { role: 'assistant', content };
+
+  // CALL ORDER IS CRITICAL — see the regression test in gemini-translate.test.js.
+  //
+  // 1. onMessage first → chat.jsx appends the assistant message (with tool_use
+  //    blocks) to conversationHistory.
+  // 2. onToolUse next, per tool block → chat.jsx runs each tool and appends
+  //    the resulting tool_result to conversationHistory.
+  //
+  // Reverse this order and the history becomes [user, tool_result, assistant],
+  // which breaks toGeminiContents on the *next* turn: when translating the
+  // tool_result the idToName lookup misses (because we haven't walked the
+  // assistant tool_use yet) and Gemini receives a functionResponse with
+  // name='unknown'. The model errors or returns garbage and the product/cart
+  // SSE event never fires.
   onMessage?.(finalMessage);
+
+  for (const block of content) {
+    if (block.type === 'tool_use') {
+      await onToolUse?.(block);
+    }
+  }
 
   return {
     ...finalMessage,

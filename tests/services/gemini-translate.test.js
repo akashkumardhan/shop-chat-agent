@@ -512,6 +512,50 @@ describe('consumeGeminiStream', () => {
     expect(final.content).toEqual([]);
     expect(final.stop_reason).toBe('end_turn');
   });
+
+  // REGRESSION: onMessage must fire BEFORE onToolUse — matching Claude's SDK
+  // contract. chat.jsx's onToolUse handler adds the tool_result to
+  // conversation history, and onMessage adds the assistant message. If the
+  // order is reversed, the next turn sees [tool_result, then assistant_msg],
+  // which corrupts the Claude→Gemini translation (idToName isn't populated
+  // yet when the tool_result is processed). Result: tool calls succeed once,
+  // but subsequent turns produce malformed Gemini requests → no product or
+  // cart cards render despite the first tool call working.
+  it('fires onMessage BEFORE onToolUse so chat.jsx history stays well-ordered', async () => {
+    const events = [];
+    const onMessage = vi.fn(() => events.push('onMessage'));
+    const onToolUse = vi.fn(() => events.push('onToolUse'));
+
+    const stream = fakeStream([
+      { textValue: 'searching...' },
+      { functionCalls: [{ name: 'search_catalog', args: { query: 'snowboards' } }] },
+    ]);
+
+    await consumeGeminiStream(stream, { onMessage, onToolUse });
+
+    expect(events).toEqual(['onMessage', 'onToolUse']);
+  });
+
+  it('finalMessage already contains the tool_use block when onMessage fires', async () => {
+    let messageAtOnMessageTime = null;
+    const onMessage = vi.fn((msg) => {
+      // Deep-clone to capture state at call-time
+      messageAtOnMessageTime = JSON.parse(JSON.stringify(msg));
+    });
+
+    const stream = fakeStream([
+      { textValue: "I'll search." },
+      { functionCalls: [{ name: 'search_catalog', args: { query: 'x' } }] },
+    ]);
+
+    await consumeGeminiStream(stream, { onMessage, onToolUse: vi.fn() });
+
+    expect(messageAtOnMessageTime).not.toBeNull();
+    expect(messageAtOnMessageTime.content).toHaveLength(2);
+    expect(messageAtOnMessageTime.content[0].type).toBe('text');
+    expect(messageAtOnMessageTime.content[1].type).toBe('tool_use');
+    expect(messageAtOnMessageTime.content[1].name).toBe('search_catalog');
+  });
 });
 
 describe('createGeminiService', () => {
