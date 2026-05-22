@@ -320,7 +320,22 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
 
     const request = {
       contents,
-      generationConfig: { maxOutputTokens: AppConfig.api.maxTokens },
+      generationConfig: {
+        maxOutputTokens: AppConfig.api.maxTokens,
+        // Disable Gemini 2.5's "thinking" mode.
+        //
+        // 2.5-series models (incl. flash) generate hidden thinking tokens
+        // before visible output. Default thinking budget is large; with a
+        // modest maxOutputTokens (2000) the entire budget is consumed by
+        // thinking, leaving zero tokens for actual content. Symptom: the
+        // stream emits no chunks, finishReason=STOP, partCount=0, and
+        // output_tokens is undefined — i.e. the response is empty.
+        //
+        // For e-commerce chat with tool use, thinking is unnecessary
+        // overhead. Disable it.
+        // See: https://ai.google.dev/gemini-api/docs/thinking
+        thinkingConfig: { thinkingBudget: 0 },
+      },
     };
     if (geminiTools) {
       request.tools = geminiTools;
