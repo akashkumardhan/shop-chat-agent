@@ -67,6 +67,121 @@ describe('toGeminiTools', () => {
     ]);
     expect(result[0].functionDeclarations[0].parameters).toEqual({ type: 'object', properties: {} });
   });
+
+  // Regression: Gemini's parameters schema is the OpenAPI 3.0 Schema subset,
+  // not full JSON Schema. It rejects keywords like additionalProperties,
+  // $schema, $id, $ref. Shopify's Storefront MCP returns schemas with these,
+  // so we must strip them at translation time.
+  it('strips additionalProperties from the top level of parameters', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { a: { type: 'string' } },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.additionalProperties).toBeUndefined();
+    expect(params.properties.a).toEqual({ type: 'string' });
+  });
+
+  it('strips additionalProperties from nested property schemas (the actual Shopify update_cart failure)', () => {
+    const result = toGeminiTools([
+      {
+        name: 'update_cart',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          properties: {
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                properties: { variant_id: { type: 'string' } },
+              },
+            },
+            metadata: {
+              type: 'object',
+              additionalProperties: { type: 'string' },
+              properties: { source: { type: 'string' } },
+            },
+          },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.properties.items.items.additionalProperties).toBeUndefined();
+    expect(params.properties.items.items.properties.variant_id).toEqual({ type: 'string' });
+    expect(params.properties.metadata.additionalProperties).toBeUndefined();
+    expect(params.properties.metadata.properties.source).toEqual({ type: 'string' });
+  });
+
+  it('strips other Gemini-incompatible keywords ($schema, $id, $ref, patternProperties)', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          $schema: 'http://json-schema.org/draft-07/schema#',
+          $id: 'foo-input',
+          type: 'object',
+          patternProperties: { '^x_': { type: 'string' } },
+          properties: { a: { type: 'string', $ref: '#/definitions/A' } },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.$schema).toBeUndefined();
+    expect(params.$id).toBeUndefined();
+    expect(params.patternProperties).toBeUndefined();
+    expect(params.properties.a.$ref).toBeUndefined();
+    expect(params.properties.a.type).toBe('string');
+  });
+
+  it('preserves valid keywords (type, description, enum, format, items, required, anyOf)', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          required: ['mode'],
+          properties: {
+            mode: { type: 'string', enum: ['fast', 'slow'], description: 'speed' },
+            tags: { type: 'array', items: { type: 'string' } },
+            either: { anyOf: [{ type: 'string' }, { type: 'number' }] },
+            when: { type: 'string', format: 'date-time' },
+          },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.required).toEqual(['mode']);
+    expect(params.properties.mode.enum).toEqual(['fast', 'slow']);
+    expect(params.properties.mode.description).toBe('speed');
+    expect(params.properties.tags.items).toEqual({ type: 'string' });
+    expect(params.properties.either.anyOf).toEqual([{ type: 'string' }, { type: 'number' }]);
+    expect(params.properties.when.format).toBe('date-time');
+  });
+
+  it('does not mutate the input schema (defensive — must not corrupt the tool registry)', () => {
+    const original = {
+      type: 'object',
+      additionalProperties: false,
+      properties: { a: { type: 'string' } },
+    };
+    const snapshot = JSON.parse(JSON.stringify(original));
+
+    toGeminiTools([{ name: 'foo', description: 'x', input_schema: original }]);
+
+    expect(original).toEqual(snapshot); // unchanged
+    expect(original.additionalProperties).toBe(false); // still there in source
+  });
 });
 
 describe('toGeminiContents', () => {

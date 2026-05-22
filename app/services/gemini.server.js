@@ -10,11 +10,13 @@
  * Claude:  [{ name, description, input_schema }, ...]
  * Gemini:  [{ functionDeclarations: [{ name, description, parameters }, ...] }]
  *
- * The JSON Schema in `input_schema` is structurally compatible with
- * Gemini's `parameters` so no schema re-walking is needed.
+ * Each `input_schema` is sanitised first because Gemini's `parameters` is
+ * the OpenAPI 3.0 Schema *subset* — not full JSON Schema. Common keywords
+ * like `additionalProperties` (which Shopify's MCP returns on update_cart
+ * and others) trigger a 400 from generativelanguage.googleapis.com.
  *
  * @param {Array<{name:string, description:string, input_schema:object}>} tools
- * @returns {Array|null} A Gemini tools array, or null if no tools (Gemini rejects an empty array on some endpoints).
+ * @returns {Array|null} A Gemini tools array, or null if no tools.
  */
 export function toGeminiTools(tools) {
   if (!Array.isArray(tools) || tools.length === 0) return null;
@@ -23,10 +25,60 @@ export function toGeminiTools(tools) {
       functionDeclarations: tools.map((t) => ({
         name: t.name,
         description: t.description,
-        parameters: t.input_schema || { type: 'object', properties: {} },
+        parameters: sanitizeSchemaForGemini(
+          t.input_schema || { type: 'object', properties: {} }
+        ),
       })),
     },
   ];
+}
+
+/**
+ * JSON-Schema keywords Gemini's API rejects. These must be stripped from
+ * any schema passed as `parameters` in a function declaration. The set
+ * mirrors the OpenAPI 3.0 Schema subset Google supports. See
+ *   https://ai.google.dev/api/caching#Schema
+ * If Gemini complains about another keyword in the future, add it here.
+ */
+const GEMINI_INCOMPATIBLE_KEYWORDS = new Set([
+  'additionalProperties',
+  'patternProperties',
+  'unevaluatedProperties',
+  'dependentSchemas',
+  'dependentRequired',
+  '$schema',
+  '$id',
+  '$ref',
+  '$defs',
+  'definitions',
+  'if',
+  'then',
+  'else',
+  'not',
+  'allOf',
+  'oneOf',
+  // intentionally NOT stripping: anyOf, enum, format, type, description,
+  // properties, items, required, nullable, minimum, maximum, minLength,
+  // maxLength — these are all valid in Gemini.
+]);
+
+/**
+ * Recursively clone a JSON Schema, dropping keywords Gemini doesn't accept.
+ * Never mutates the input; safe to call on the live tool registry's schemas.
+ *
+ * @param {*} schema
+ * @returns {*}
+ */
+export function sanitizeSchemaForGemini(schema) {
+  if (schema === null || typeof schema !== 'object') return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeSchemaForGemini);
+
+  const out = {};
+  for (const [k, v] of Object.entries(schema)) {
+    if (GEMINI_INCOMPATIBLE_KEYWORDS.has(k)) continue;
+    out[k] = sanitizeSchemaForGemini(v);
+  }
+  return out;
 }
 
 /**
