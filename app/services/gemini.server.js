@@ -326,8 +326,60 @@ export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
       request.tools = geminiTools;
     }
 
-    const stream = await model.generateContentStream(request);
-    return consumeGeminiStream(stream, callbacks);
+    console.log(
+      `[gemini] request: contents=${contents.length} msg(s), tools=${geminiTools ? geminiTools[0].functionDeclarations.length : 0}, model=${AppConfig.api.geminiModel}, sys-prompt=${systemInstruction.length} chars`
+    );
+
+    let stream;
+    try {
+      stream = await model.generateContentStream(request);
+    } catch (e) {
+      console.error("[gemini] generateContentStream threw:", e?.message || e);
+      throw e;
+    }
+
+    const finalMessage = await consumeGeminiStream(stream, callbacks);
+
+    // Pull the *full* response object for metadata that the streaming
+    // chunks don't carry (finish reason, safety ratings, token usage,
+    // prompt-level block reasons). If Gemini returned nothing visible
+    // (no text, no functionCall) this is the place to see why.
+    try {
+      const full = await stream.response;
+      const cand = full?.candidates?.[0];
+      const finishReason = cand?.finishReason;
+      const blockReason = full?.promptFeedback?.blockReason;
+      const safetyRatings = cand?.safetyRatings || full?.promptFeedback?.safetyRatings;
+      const usage = full?.usageMetadata;
+      const partCount = cand?.content?.parts?.length || 0;
+
+      const summary = [
+        `finishReason=${finishReason || 'n/a'}`,
+        `partCount=${partCount}`,
+        blockReason ? `blockReason=${blockReason}` : null,
+        safetyRatings && safetyRatings.length ? `safety=${JSON.stringify(safetyRatings.filter(r => r.blocked || r.probability && r.probability !== 'NEGLIGIBLE'))}` : null,
+        usage ? `tokens(in=${usage.promptTokenCount},out=${usage.candidatesTokenCount},total=${usage.totalTokenCount})` : null,
+      ].filter(Boolean).join(' ');
+
+      console.log(`[gemini] response: ${summary}`);
+
+      // If the response is empty (no text, no tools) AND the finishReason
+      // explains why, surface that to the chat as an actionable error.
+      if (finalMessage.content.length === 0 && finishReason && finishReason !== 'STOP') {
+        const reason = blockReason || finishReason;
+        const block = {
+          type: 'text',
+          text: `[Gemini returned an empty response: ${reason}. Try rephrasing your question, or check the server log for safety/policy details.]`,
+        };
+        finalMessage.content.push(block);
+        callbacks.onContentBlock?.(block);
+        callbacks.onText?.(block.text);
+      }
+    } catch (e) {
+      console.error("[gemini] failed to read response metadata:", e?.message || e);
+    }
+
+    return finalMessage;
   };
 
   return { streamConversation, getSystemPrompt };
