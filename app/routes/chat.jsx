@@ -3,11 +3,12 @@
  * Handles chat interactions with Claude API and tools
  */
 import MCPClient from "../mcp-client";
-import { saveMessage, getConversationHistory, storeCustomerAccountUrls, getCustomerAccountUrls as getCustomerAccountUrlsFromDb } from "../db.server";
+import { saveMessage, getConversationHistory, storeCustomerAccountUrls, getCustomerAccountUrls as getCustomerAccountUrlsFromDb, setConversationShop } from "../db.server";
 import AppConfig from "../services/config.server";
 import { createSseStream } from "../services/streaming.server";
 import { createClaudeService } from "../services/claude.server";
 import { createToolService } from "../services/tool.server";
+import { localToolDefinitions } from "../services/tools";
 
 
 /**
@@ -129,12 +130,32 @@ async function handleChatSession({
   const accountUrls = await getCustomerAccountUrls(shopDomain, conversationId);
   const mcpApiUrl = accountUrls?.mcpApiUrl ?? null;
 
+  // Extract bare host ("acme.myshopify.com") for Admin API calls.
+  let shopHost = null;
+  try {
+    if (shopDomain) shopHost = new URL(shopDomain).hostname;
+  } catch (_) {
+    shopHost = null;
+  }
+
+  // Persist shop on the Conversation row for future analytics segmentation.
+  if (shopHost) {
+    setConversationShop(conversationId, shopHost).catch((e) =>
+      console.error("setConversationShop failed:", e)
+    );
+  }
+
   const mcpClient = new MCPClient(
     shopDomain,
     conversationId,
     shopId,
     mcpApiUrl,
+    shopHost,
   );
+
+  // Register locally-defined tools (orders, returns, profile). These run in
+  // this app and use Admin API + Customer Account API directly.
+  mcpClient.registerLocalTools(localToolDefinitions);
 
   try {
     // Send conversation ID to client
@@ -149,6 +170,11 @@ async function handleChatSession({
 
       console.log(`Connected to MCP with ${storefrontMcpTools.length} tools`);
       console.log(`Connected to customer MCP with ${customerMcpTools.length} tools`);
+      console.log(
+        `[chat] sending ${mcpClient.tools.length} unique tools to Claude: ${mcpClient.tools
+          .map((t) => t.name)
+          .join(", ")}`
+      );
     } catch (error) {
       console.warn('Failed to connect to MCP servers, continuing without tools:', error.message);
     }
@@ -305,6 +331,7 @@ async function getCustomerAccountUrls(shopDomain, conversationId) {
     ]).then(async ([mcpResponse, openidResponse]) => {
       const response = {
         mcpApiUrl: mcpResponse.mcp_api,
+        graphqlApiUrl: mcpResponse.graphql_api,
         authorizationUrl: openidResponse.authorization_endpoint,
         tokenUrl: openidResponse.token_endpoint,
       };
@@ -312,6 +339,7 @@ async function getCustomerAccountUrls(shopDomain, conversationId) {
       await storeCustomerAccountUrls({
         conversationId,
         mcpApiUrl: mcpResponse.mcp_api,
+        graphqlApiUrl: mcpResponse.graphql_api,
         authorizationUrl: openidResponse.authorization_endpoint,
         tokenUrl: openidResponse.token_endpoint,
       });

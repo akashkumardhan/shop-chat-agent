@@ -21,12 +21,22 @@ export function streamChat(payload, handlers) {
 
   (async () => {
     try {
+      // Forward shopId so the backend can resolve the merchant Session for
+      // Admin API calls and embed it in the OAuth `state` for the customer
+      // auth callback. Falls back to omitting the header if unset.
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
+      };
+      const shopId =
+        window.shopAIChatConfig && window.shopAIChatConfig.shopId;
+      if (shopId != null && shopId !== '') {
+        headers['X-Shopify-Shop-Id'] = String(shopId);
+      }
+
       const res = await fetch(CHAT_URL, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream',
-        },
+        headers,
         body: JSON.stringify(payload),
         signal: controller.signal,
       });

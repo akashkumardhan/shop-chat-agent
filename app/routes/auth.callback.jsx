@@ -7,15 +7,39 @@ export async function loader({ request }) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  const errorParam = url.searchParams.get("error");
+  const errorDescription = url.searchParams.get("error_description");
+
+  console.log(`[auth-callback] hit: code=${code ? `${code.slice(0, 8)}…` : 'NONE'}, state=${state}, error=${errorParam || 'none'}`);
+
+  // Shopify redirects here with ?error=... when something is wrong (e.g. invalid_redirect_uri).
+  // Surface it loudly so the developer can see what happened.
+  if (errorParam) {
+    console.error(`[auth-callback] Shopify returned an error: ${errorParam} — ${errorDescription || 'no description'}`);
+    return new Response(
+      `<!DOCTYPE html><html><body><h2>Authorization failed</h2><p><strong>${errorParam}</strong>: ${errorDescription || 'no description'}</p><p>Check the app server logs for details.</p></body></html>`,
+      { status: 400, headers: { "Content-Type": "text/html" } }
+    );
+  }
+
+  if (!state) {
+    console.error("[auth-callback] state parameter is missing");
+    return new Response(JSON.stringify({ error: "state parameter is missing" }), { status: 400 });
+  }
+
   const [conversationId, shopId] = state.split("-");
+  console.log(`[auth-callback] parsed state → conversationId=${conversationId}, shopId=${shopId}`);
 
   if (!code) {
+    console.error("[auth-callback] code parameter is missing");
     return new Response(JSON.stringify({ error: "Authorization code is missing" }), { status: 400 });
   }
 
   try {
     // Exchange code for access token
+    console.log("[auth-callback] exchanging code for token...");
     const tokenResponse = await exchangeCodeForToken(code, state);
+    console.log(`[auth-callback] token exchange OK: expires_in=${tokenResponse.expires_in}s, scope=${tokenResponse.scope || 'n/a'}`);
 
     // Store token in database
     try {
@@ -30,9 +54,9 @@ export async function loader({ request }) {
         expiresAt
       );
 
-      console.log('Stored customer token in database for conversation:', conversationId);
+      console.log(`[auth-callback] ✓ Stored CustomerToken for conversation ${conversationId}, expires ${expiresAt.toISOString()}`);
     } catch (error) {
-      console.error('Failed to store token in database:', error);
+      console.error('[auth-callback] ✗ Failed to store token in database:', error);
       // Continue anyway to not disrupt user flow
     }
 
@@ -78,9 +102,12 @@ export async function loader({ request }) {
       }
     });
   } catch (error) {
-    console.error("Error exchanging code for token:", error);
-    console.log("shopId", shopId);
-    return new Response(JSON.stringify({ error: "Failed to obtain access token" }), { status: 500 });
+    console.error("[auth-callback] ✗ Token exchange or storage threw:", error);
+    console.log("[auth-callback] shopId from state was:", shopId);
+    return new Response(
+      `<!DOCTYPE html><html><body><h2>Authorization failed</h2><p>Token exchange error. Check app server logs for [auth-callback] entries.</p><pre>${String(error.message || error)}</pre></body></html>`,
+      { status: 500, headers: { "Content-Type": "text/html" } }
+    );
   }
 }
 
@@ -111,13 +138,12 @@ async function exchangeCodeForToken(code, state) {
     const verifierRecord = await getCodeVerifier(state);
     if (verifierRecord) {
       codeVerifier = verifierRecord.verifier;
+      console.log(`[auth-callback] retrieved verifier for state=${state}, verifier=${codeVerifier.slice(0, 10)}…`);
     } else {
-      console.warn("Code verifier not found for state:", state);
-      // Proceed anyway, since we might be using an older flow without PKCE
+      console.warn(`[auth-callback] ⚠ no verifier found in DB for state=${state} — token exchange will likely fail`);
     }
   } catch (error) {
-    console.error("Error retrieving code verifier:", error);
-    // Proceed anyway and attempt the token exchange
+    console.error("[auth-callback] error retrieving code verifier:", error);
   }
 
   const requestBody = {

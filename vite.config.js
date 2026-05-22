@@ -37,7 +37,14 @@ if (host === "localhost") {
 
 export default defineConfig({
   server: {
-    allowedHosts: [host],
+    // Vite's default host-header check blocks unknown hostnames (DNS-rebinding
+    // protection). We allow:
+    //   1. Whatever SHOPIFY_APP_URL resolves to (set by `shopify app dev`)
+    //   2. Any *.trycloudflare.com subdomain — Cloudflare Quick Tunnels rotate
+    //      each session so we can't hardcode the exact value
+    //   3. localhost / 127.0.0.1 for --use-localhost mode and direct probes
+    // The leading dot syntax matches any subdomain of the listed domain.
+    allowedHosts: [host, ".trycloudflare.com", "localhost", "127.0.0.1"],
     cors: {
       preflightContinue: true,
     },

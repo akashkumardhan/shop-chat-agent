@@ -12,6 +12,22 @@ export async function generateAuthUrl(conversationId, shopId) {
 
   // Generate authorization URL for the customer
   const clientId = process.env.SHOPIFY_API_KEY;
+  //
+  // Scope strategy (current production-safe choice):
+  //   customer-account-mcp-api:full — Customer Account MCP server endpoint
+  //                               (/customer/api/mcp). This is the scope Shopify
+  //                               authorizes by default for embedded apps with
+  //                               customer accounts auth.
+  //
+  // We tried adding `customer-account-api:full` for direct Customer Account
+  // GraphQL access, but Shopify returned
+  //   "The requested scope is invalid, unknown, or malformed."
+  // because that scope requires Level 2 Protected Customer Data approval on
+  // the Partner Dashboard — a manual review step this dev app hasn't passed.
+  //
+  // Implication: any customer-side tool that calls the direct GraphQL endpoint
+  // (`/account/customer/api/<ver>/graphql`) will fail with "Invalid scope".
+  // Use the MCP server's `tools/call` endpoint instead.
   const scope = "customer-account-mcp-api:full";
   const responseType = "code";
 
@@ -25,11 +41,16 @@ export async function generateAuthUrl(conversationId, shopId) {
   const verifier = generateCodeVerifier();
   const challenge = await generateCodeChallenge(verifier);
 
-  // Store the code verifier in the database
+  console.log(`[auth-server] generateAuthUrl: state=${state}, verifier=${verifier.slice(0, 10)}…, challenge=${challenge.slice(0, 10)}…`);
+
+  // Store the code verifier in the database. storeCodeVerifier UPSERTS by
+  // state, so re-running generateAuthUrl for the same conversation replaces
+  // the previous verifier — keeping DB and most-recent OAuth URL in sync.
   try {
     await storeCodeVerifier(state, verifier);
+    console.log(`[auth-server] ✓ stored verifier for state=${state}`);
   } catch (error) {
-    console.error('Failed to store code verifier:', error);
+    console.error('[auth-server] ✗ Failed to store code verifier:', error);
   }
 
   // Set code_challenge and code_challenge_method parameters

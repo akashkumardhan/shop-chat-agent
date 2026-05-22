@@ -22,13 +22,24 @@ export async function storeCodeVerifier(state, verifier) {
   expiresAt.setMinutes(expiresAt.getMinutes() + 10);
 
   try {
-    return await prisma.codeVerifier.create({
-      data: {
-        id: `cv_${Date.now()}`,
-        state,
-        verifier,
-        expiresAt
-      }
+    // UPSERT, not create.
+    //
+    // `state` is `@unique`. A plain `create()` throws a unique-constraint
+    // violation if generateAuthUrl is called twice for the same conversation
+    // before the customer completes OAuth — which happens whenever Claude
+    // calls a customer-auth-required tool more than once in a single turn.
+    //
+    // Previously that throw was swallowed in auth.server.js, leaving the OLD
+    // verifier in the DB while the NEW challenge was sent to Shopify in the
+    // OAuth URL. Token exchange then failed with
+    // "invalid_grant: code_verifier is invalid".
+    //
+    // The upsert keeps DB and URL in sync: the freshest verifier always wins,
+    // and its corresponding challenge is what's in the most recent OAuth URL.
+    return await prisma.codeVerifier.upsert({
+      where: { state },
+      create: { id: `cv_${Date.now()}`, state, verifier, expiresAt },
+      update: { verifier, expiresAt },
     });
   } catch (error) {
     console.error('Error storing code verifier:', error);
@@ -135,6 +146,26 @@ export async function getCustomerToken(conversationId) {
 }
 
 /**
+ * Delete the cached CustomerToken row(s) for a conversation.
+ * Used to clear a token whose scopes are stale (e.g. when the API responds
+ * with 401 because the app's declared scopes have changed since the token
+ * was minted). The next chat turn will trigger a fresh OAuth flow.
+ *
+ * @param {string} conversationId
+ */
+export async function clearCustomerToken(conversationId) {
+  if (!conversationId) return null;
+  try {
+    return await prisma.customerToken.deleteMany({
+      where: { conversationId },
+    });
+  } catch (error) {
+    console.error('Error clearing customer token:', error);
+    return null;
+  }
+}
+
+/**
  * Create or update a conversation in the database
  * @param {string} conversationId - The conversation ID
  * @returns {Promise<Object>} - The created or updated conversation
@@ -212,25 +243,29 @@ export async function getConversationHistory(conversationId) {
 
 /**
  * Store customer account URLs for a conversation
- * @param {string} conversationId - The conversation ID
- * @param {string} mcpApiUrl - The customer account MCP URL
- * @param {string} authorizationUrl - The customer account authorization URL
- * @param {string} tokenUrl - The customer account token URL
+ * @param {Object} params
+ * @param {string} params.conversationId - The conversation ID
+ * @param {string} [params.mcpApiUrl] - The customer account MCP URL
+ * @param {string} [params.graphqlApiUrl] - The customer account GraphQL URL
+ * @param {string} [params.authorizationUrl] - The customer account authorization URL
+ * @param {string} [params.tokenUrl] - The customer account token URL
  * @returns {Promise<Object>} - The saved urls object
  */
-export async function storeCustomerAccountUrls({conversationId, mcpApiUrl, authorizationUrl, tokenUrl}) {
+export async function storeCustomerAccountUrls({conversationId, mcpApiUrl, graphqlApiUrl, authorizationUrl, tokenUrl}) {
   try {
     return await prisma.customerAccountUrls.upsert({
       where: { conversationId },
       create: {
         conversationId,
         mcpApiUrl,
+        graphqlApiUrl,
         authorizationUrl,
         tokenUrl,
         updatedAt: new Date(),
       },
       update: {
         mcpApiUrl,
+        graphqlApiUrl,
         authorizationUrl,
         tokenUrl,
         updatedAt: new Date(),
@@ -254,6 +289,75 @@ export async function getCustomerAccountUrls(conversationId) {
     });
   } catch (error) {
     console.error('Error retrieving customer account URLs:', error);
+    return null;
+  }
+}
+
+/**
+ * Persist the `shop` for a conversation. Called once per conversation when the widget posts a message.
+ * @param {string} conversationId
+ * @param {string} shop
+ */
+export async function setConversationShop(conversationId, shop) {
+  if (!conversationId || !shop) return null;
+  try {
+    return await prisma.conversation.upsert({
+      where: { id: conversationId },
+      create: { id: conversationId, shop },
+      update: { shop },
+    });
+  } catch (error) {
+    console.error('Error setting conversation shop:', error);
+    return null;
+  }
+}
+
+/**
+ * Get the pagination cursor for "show me more orders" continuations.
+ * @param {string} conversationId
+ */
+export async function getOrderCursor(conversationId) {
+  try {
+    const c = await prisma.conversation.findUnique({ where: { id: conversationId } });
+    return c?.orderCursor || null;
+  } catch (error) {
+    console.error('Error reading order cursor:', error);
+    return null;
+  }
+}
+
+/**
+ * Persist the pagination cursor.
+ * @param {string} conversationId
+ * @param {string|null} cursor
+ */
+export async function setOrderCursor(conversationId, cursor) {
+  try {
+    return await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { orderCursor: cursor },
+    });
+  } catch (error) {
+    console.error('Error setting order cursor:', error);
+    return null;
+  }
+}
+
+/**
+ * Find the most recent admin Session for a shop. Used to authorise server-side
+ * Admin API calls (e.g. orderCancel) on behalf of an authenticated customer.
+ * @param {string} shop - "acme.myshopify.com"
+ */
+export async function getShopSession(shop) {
+  if (!shop) return null;
+  try {
+    const session = await prisma.session.findFirst({
+      where: { shop },
+      orderBy: { expires: 'desc' },
+    });
+    return session;
+  } catch (error) {
+    console.error('Error reading shop session:', error);
     return null;
   }
 }

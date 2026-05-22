@@ -1,5 +1,6 @@
 import { generateAuthUrl } from "./auth.server";
 import { getCustomerToken } from "./db.server";
+import { isLocalTool, runLocalTool } from "./services/tools";
 
 /**
  * Client for interacting with Model Context Protocol (MCP) API endpoints.
@@ -13,10 +14,11 @@ class MCPClient {
    * @param {string} conversationId - ID for the current conversation
    * @param {string} shopId - ID of the Shopify shop
    */
-  constructor(hostUrl, conversationId, shopId, customerMcpEndpoint) {
+  constructor(hostUrl, conversationId, shopId, customerMcpEndpoint, shopDomain) {
     this.tools = [];
     this.customerTools = [];
     this.storefrontTools = [];
+    this.localTools = [];
     // TODO: Make this dynamic, for that first we need to allow access of mcp tools on password proteted demo stores.
     this.storefrontMcpEndpoint = `${hostUrl}/api/mcp`;
 
@@ -25,6 +27,50 @@ class MCPClient {
     this.customerAccessToken = "";
     this.conversationId = conversationId;
     this.shopId = shopId;
+    this.shopDomain = shopDomain || null; // bare host like "acme.myshopify.com" for Admin API calls
+  }
+
+  /**
+   * Register locally-defined tools (executed inside this app, not via MCP).
+   * Pass the list returned from `services/tools.localToolDefinitions`.
+   *
+   * @param {Array<{name: string, description: string, input_schema: Object}>} definitions
+   */
+  registerLocalTools(definitions = []) {
+    this.localTools = definitions;
+    this._rebuildTools();
+  }
+
+  /**
+   * Rebuild `this.tools` from the three sources (local, customer MCP, storefront MCP),
+   * de-duplicating by name. Local tools take precedence; if an MCP server exposes a
+   * tool with the same name as one of ours, the local wrapper wins.
+   *
+   * Claude's API rejects requests with duplicate tool names ("tools: Tool names must be
+   * unique"), so this guard is mandatory whenever a new source is merged.
+   *
+   * @private
+   */
+  _rebuildTools() {
+    const seen = new Set();
+    const out = [];
+    const sources = [
+      { label: "local", tools: this.localTools },
+      { label: "customer", tools: this.customerTools },
+      { label: "storefront", tools: this.storefrontTools },
+    ];
+    for (const { label, tools } of sources) {
+      for (const t of tools || []) {
+        if (!t || !t.name) continue;
+        if (seen.has(t.name)) {
+          console.log(`[mcp-client] skipping duplicate tool '${t.name}' from ${label} source (already registered).`);
+          continue;
+        }
+        seen.add(t.name);
+        out.push(t);
+      }
+    }
+    this.tools = out;
   }
 
   /**
@@ -67,7 +113,7 @@ class MCPClient {
       const customerTools = this._formatToolsData(toolsData);
 
       this.customerTools = customerTools;
-      this.tools = [...this.tools, ...customerTools];
+      this._rebuildTools();
 
       return customerTools;
     } catch (e) {
@@ -102,7 +148,7 @@ class MCPClient {
       const storefrontTools = this._formatToolsData(toolsData);
 
       this.storefrontTools = storefrontTools;
-      this.tools = [...this.tools, ...storefrontTools];
+      this._rebuildTools();
 
       return storefrontTools;
     } catch (e) {
@@ -120,6 +166,10 @@ class MCPClient {
    * @throws {Error} If tool is not found or call fails
    */
   async callTool(toolName, toolArgs) {
+    // Local tools first — they may shadow MCP names intentionally (e.g. `list_my_orders` over `get_most_recent_order_status`).
+    if (isLocalTool(toolName) && this.localTools.some(t => t.name === toolName)) {
+      return this.callLocalTool(toolName, toolArgs);
+    }
     if (this.customerTools.some(tool => tool.name === toolName)) {
       return this.callCustomerTool(toolName, toolArgs);
     } else if (this.storefrontTools.some(tool => tool.name === toolName)) {
@@ -127,6 +177,45 @@ class MCPClient {
     } else {
       throw new Error(`Tool ${toolName} not found`);
     }
+  }
+
+  /**
+   * Execute a locally-defined tool (orders, returns, profile). Mirrors the
+   * shape returned by MCP calls so `tool.server.js` can handle it uniformly.
+   *
+   * @param {string} toolName
+   * @param {Object} toolArgs
+   * @returns {Promise<Object>}
+   */
+  async callLocalTool(toolName, toolArgs) {
+    console.log("Calling local tool", toolName, toolArgs);
+    const ctx = {
+      conversationId: this.conversationId,
+      shop: this.shopDomain,
+    };
+    const result = await runLocalTool(toolName, ctx, toolArgs);
+
+    if (result.error && result.error.type === "auth_required") {
+      // Mirror the customer-MCP auth flow: generate an auth URL the widget can pop open.
+      try {
+        const authResponse = await generateAuthUrl(this.conversationId, this.shopId);
+        return {
+          error: {
+            type: "auth_required",
+            data: `You need to authorize the app to access your customer data. [Click here to authorize](${authResponse.url})`,
+          },
+        };
+      } catch (e) {
+        return {
+          error: {
+            type: "auth_required",
+            data: "Please sign in to your customer account to continue.",
+          },
+        };
+      }
+    }
+
+    return result;
   }
 
   /**

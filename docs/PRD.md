@@ -18,7 +18,7 @@
 5. Personas & JTBD
 6. Current state assessment
 7. Vertical Pack architecture
-8. Feature specification (F1–F18)
+8. Feature specification (F1–F37)
 9. Cross-cutting requirements
 10. Phasing
 11. Data model changes
@@ -62,6 +62,20 @@
     - I.20 Component implementation map (which files to touch)
     - I.21 ASCII wireframes
     - I.22 Acceptance criteria
+23. Appendix J — Conversational Query Catalog (50+ queries mapped to features and Shopify tools)
+    - J.1 Catalog discovery
+    - J.2 Product detail & education
+    - J.3 Sizing & fit
+    - J.4 Pricing & buy-timing
+    - J.5 Inventory & availability
+    - J.6 Discounts & deals
+    - J.7 Shipping & delivery
+    - J.8 Returns, exchanges, order ops
+    - J.9 Account, loyalty, gift cards
+    - J.10 Recommendations & gifts
+    - J.11 Decision support
+    - J.12 Out-of-catalog & substitution
+    - J.13 Edge cases & safety
 
 ---
 
@@ -201,7 +215,7 @@ Shopify merchants overwhelmingly want one tool that adapts to their shop, not a 
 | Chat SSE endpoint | `app/routes/chat.jsx` | Functional — streams Claude responses, calls MCP tools |
 | Claude service | `app/services/claude.server.js` | Single model (`claude-sonnet-4-20250514`), basic streaming |
 | MCP client | `app/mcp-client.js` | Storefront + Customer MCP, JSON-RPC, OAuth for customer |
-| Tool service | `app/services/tool.server.js` | Product search formatting only |
+| Tool service | `app/services/tool.server.js` | Product search formatting only — **references the deprecated `search_shop_catalog` tool name; must migrate to UCP-conformant `search_catalog` before June 15, 2026 (see F36)** |
 | Prompts | `app/prompts/prompts.json` | 2 personas: `standardAssistant`, `enthusiasticAssistant` |
 | Config | `app/services/config.server.js` | Hardcoded — model, max tokens, default prompt |
 | Persistence | `prisma/schema.prisma` | Session, CustomerToken, Conversation, Message, CustomerAccountUrls |
@@ -913,6 +927,767 @@ The assumption-killer. Without it, no claim of lift is defensible.
 
 ---
 
+---
+
+### F19 — Reviews & community Q&A synthesis — `P1`
+
+**Why.** Rufus's signature move: synthesizing customer reviews and Q&A directly into the conversational answer. A shopper asking "is this comfortable for wide feet?" wants to hear *what other wide-footed buyers said*, not an assistant guessing. Reviews are the highest-trust source on a PDP, and we are not using them today.
+
+**What it does.** When a shopper asks about a product attribute, fit, durability, or use-case fit, the assistant pulls reviews and Q&A from the merchant's installed reviews app, retrieves the most relevant snippets, and synthesizes a balanced answer ("Of the 312 reviews, most wide-footed buyers said the Brooks Ghost has plenty of room — a few mentioned the heel runs narrow"). Includes direct citations the shopper can expand.
+
+**Vertical-aware behaviors.**
+
+- Jewelry: surface review themes about sizing accuracy, daily-wear durability, gift-recipient reactions
+- Fashion: fit feedback ("runs small/large"), fabric feel, after-wash quality
+- Footwear: width fit, break-in time, durability across miles
+- Electronics: real-world battery life, build quality, "how it compares to my old X"
+- Flowers: freshness on arrival, lasted-N-days, packaging quality
+- Beauty: skin-type fit, sensitivity reactions, scent persistence
+- Home: assembly time, real-room photos, comfort over time
+
+**Implementation.** Adapter pattern — one interface, multiple reviews-app implementations:
+
+```js
+// app/services/reviews/index.js
+class ReviewsAdapter {
+  async getReviewsForProduct(productId, { limit, sort, filterByAttribute }) {}
+  async getQuestionsForProduct(productId) {}
+  async getSentimentSummary(productId) {}
+}
+```
+
+Ship adapters for: **Yotpo, Loox, Judge.me, Stamped, Okendo** in v1 (top 5 by Shopify install share). Each adapter implements the same interface. Merchant selects active reviews app in admin (auto-detected from installed Shopify apps when possible).
+
+Retrieved review snippets are passed to Claude in a `[Reviews context: ...]` block in the system message. The assistant is instructed to cite, never invent, and to flag low-review-count products ("This is new; only 4 reviews so far").
+
+**Files to touch / create.**
+
+- `app/services/reviews/index.js` — adapter interface
+- `app/services/reviews/adapters/{yotpo,loox,judgeme,stamped,okendo}.js`
+- `app/services/flows/reviewsQuery.js` — tool `query_product_reviews(product_id, intent)`
+- `app/routes/chat.jsx` — register the reviews tool alongside other tools
+- `app/prompts/base.md` — instruct on review citation behavior
+- `app/routes/app.knowledge.jsx` (admin) — reviews-app picker
+
+**Acceptance criteria.**
+
+- [ ] Shopper asks "do these shoes run wide?" on a footwear PDP → assistant pulls reviews mentioning width, summarizes faithfully, cites count
+- [ ] Product with <10 reviews → assistant says so explicitly rather than overselling consensus
+- [ ] Assistant never fabricates a review snippet not present in the adapter response
+- [ ] Switching reviews apps in admin works without code change (adapter swap)
+- [ ] Q&A from product Q&A apps is retrieved and surfaced similarly
+- [ ] Per-pack review-theme filters surface the right attribute (footwear: width/break-in; beauty: sensitivity; etc.)
+
+---
+
+### F20 — Personalization & memory layer — `P1`
+
+**Why.** Rufus's other signature: remembering the shopper across sessions and tailoring the same product to different shoppers based on accumulated taste. ShopLC's +14% AOV with iAdvize was without persistent memory. With it, the ceiling is higher.
+
+**What it does.** With explicit shopper opt-in, the assistant builds a lightweight, time-decayed taste profile from interactions: stated preferences, products viewed/added to cart, completed orders, discovery-flow answers (occasion, recipient, budget patterns), language preference, locale. On subsequent sessions, the assistant uses the profile to:
+
+- Frame the same product differently for different shoppers ("Given you've been buying minimalist gold pieces, you might like this for…")
+- Reorder-by-reference ("get me that hand cream I bought in March" → finds the order, offers to re-add)
+- Replenishment nudges ("It's been about 6 weeks since you bought {beauty product} — running low?")
+- Skip questions in discovery flows that we already know the answer to
+- Surface adjacent categories the profile suggests interest in
+
+**Privacy / trust constraints (non-negotiable).**
+
+- **Opt-in by default.** New shoppers see no memory effects until they opt in via a one-time prompt after the third session.
+- **Time-decay.** Profile attributes weighted by recency; un-touched attributes age out at 12 months.
+- **Transparent.** A "What does the assistant know about me?" view in the chat menu shows the profile in plain language with an erase button.
+- **Local-first option.** Merchant can opt to store the profile in shopper-side localStorage instead of merchant DB (slightly weaker personalization, stronger privacy story).
+- **No cross-merchant sharing.** Profile is per-shop, never aggregated across merchants.
+- **Auth-gated.** Persistent profile requires customer login (MCP customer auth); guest sessions get session-only memory only.
+
+**Vertical-aware behaviors.**
+
+- Beauty / flowers (repeat-purchase verticals): replenishment nudges are most useful
+- Jewelry / home (long-purchase-cycle): less replenishment, more taste-profile framing
+- Fashion / footwear: size memory is the killer feature — never ask for size again once known and saved
+
+**Files to touch / create.**
+
+- `prisma/schema.prisma` — `ShopperProfile`, `ShopperProfileAttribute` models
+- `app/services/personalization/{profile,decay,update}.js`
+- `app/routes/chat.jsx` — inject profile into system context as `[Shopper profile: ...]`
+- `app/routes/app.privacy.jsx` (admin) — merchant controls (memory enabled? local-first? retention)
+- New shopper-facing UI: "Memory" menu item in widget chat menu
+
+**Acceptance criteria.**
+
+- [ ] Returning logged-in shopper with opted-in memory has profile injected into next conversation
+- [ ] Shopper can view profile in plain language and erase
+- [ ] Attributes touched in last 30 days outweigh those touched 6+ months ago in framing decisions
+- [ ] Discovery flows skip steps already answered ("I know you're a US size 7 — using that as the default")
+- [ ] Replenishment nudge fires only when shopper has 2+ purchases of the same/similar item and the typical interval has elapsed
+- [ ] Without opt-in, no profile is built or used (session-only memory only)
+
+---
+
+### F21 — Conversational checkout completion — `P2`
+
+**Why.** Closing the loop. Today the assistant builds a cart and hands the shopper to the merchant's checkout page. Sometimes that's the right call (trusted Shop Pay flow). Other times — especially for known shoppers on small carts — completing in chat is faster.
+
+**What it does.** When the shopper signals checkout intent and the merchant has enabled inline checkout, the assistant offers:
+
+1. Confirm cart summary inline
+2. Address selection (saved addresses from customer login, or new — autofilled where possible)
+3. Shipping method selection
+4. Discount code application (or detect+apply an eligible code)
+5. Payment via Shop Pay (preferred — one-tap), Apple Pay, Google Pay, or saved card
+6. Order confirmation card with tracking expectation
+
+The shopper can hand off to the full checkout page at any step ("I'll do it on the cart page").
+
+**Risks called out:** this can *hurt* conversion if shoppers trust the standard checkout more than an unfamiliar inline checkout. Default to OFF; merchants opt in. A/B harness required.
+
+**Files to touch / create.**
+
+- `app/services/flows/checkout.js` — orchestration tool
+- Integration with Shopify Checkout API (via existing MCP + new tools where needed)
+- New message blocks in widget: address picker, shipping picker, payment confirm
+- Admin toggle: "Enable conversational checkout (experimental)"
+
+**Acceptance criteria.**
+
+- [ ] Default state: conversational checkout is OFF; assistant hands off to cart page
+- [ ] When enabled, shopper can complete a $50 cart in <5 chat turns
+- [ ] Shop Pay one-tap works if the shopper has it
+- [ ] Discount code field accepts code or auto-applies eligible codes
+- [ ] Shopper can bail to standard checkout at any step
+- [ ] A/B comparison vs. handoff-to-cart-page baseline available in analytics
+- [ ] Default behavior on high-value carts (>$500): always hand off to standard checkout, never inline
+
+---
+
+### F22 — Post-purchase operations (modify, return, exchange, reorder) — `P1`
+
+**Why.** Octocom and VanChat have this; we don't. Order changes, returns, and exchanges are huge sources of support load and the highest-stakes touchpoints in a shopper's relationship with a merchant. Doing this *inline* (not via handoff or a separate portal) builds trust.
+
+**What it does.** A set of tools the assistant can call on authenticated shoppers:
+
+- **Modify order** — change shipping address (before ship), swap variant (if not shipped), cancel (if not shipped)
+- **Initiate return** — pull eligible items, ask reason (with merchant-defined reason codes), generate return label, surface refund expectation
+- **Initiate exchange** — same as return but flag as exchange; if size-related (footwear/fashion), use the sizing advisor to recommend the correct size
+- **Refund status** — check status of in-flight refund
+- **Reorder** — re-add items from a past order to the current cart in one tap; for replenishable categories, offer subscription instead
+
+Integrates with the merchant's returns app (Loop / Returnly / AfterShip Returns) via adapter pattern — same approach as F19.
+
+**Vertical-aware behaviors.**
+
+- Footwear / fashion: returns flow heavily uses the sizing advisor to drive *exchange* over refund
+- Jewelry: high-value returns trigger handoff after intake (custom resize, repair, etc.)
+- Beauty: opened-product return policy is delicate — surface verbatim from merchant policy
+- Home: large-item returns flag the merchant's restocking fees and pickup logistics
+- Flowers: time-window for freshness complaints (typically 24h) and merchant policy
+
+**Files to touch / create.**
+
+- `app/services/returns/{adapter,loop,returnly,aftership}.js`
+- `app/services/flows/orderOps.js` — tools `modify_order`, `initiate_return`, `initiate_exchange`, `check_refund_status`, `reorder_from_history`
+- `prisma/schema.prisma` — `OrderOperation` table for audit
+- Admin: returns-app picker
+- Widget: order-modification card, return-flow card, exchange-with-sizing card
+
+**Acceptance criteria.**
+
+- [ ] Logged-in shopper says "I want to return order #1024" → flow lists eligible items + reason picker + label generation
+- [ ] Footwear shopper returning because of size → assistant suggests exchange via sizing advisor before processing refund
+- [ ] Beauty shopper trying to return an opened product → merchant's policy surfaces verbatim
+- [ ] Order modification (address change) succeeds for pre-ship orders only
+- [ ] Replenishable purchase → reorder offers subscription option
+- [ ] All operations are audit-logged
+
+---
+
+### F23 — Voice mode (full-duplex voice in 12 languages) — `P3`
+
+**Why.** Amazon's May 2026 merger of Rufus into "Alexa for Shopping" signals the strategic direction — voice-first agentic shopping. Today, browser-shopper voice usage is low outside accessibility contexts; we should ship the affordance and watch usage, not bet the roadmap on it. **Marked P3 intentionally** until adoption data justifies promotion.
+
+**What it does.**
+
+- Microphone button in the composer; tap-to-talk or push-and-hold
+- Browser SpeechRecognition for transcription; falls back to Whisper API if the browser is unsupported
+- TTS for assistant responses with merchant-configurable voice; defaults to natural-sounding voice per locale
+- Voice-equivalent of every text interaction — no separate voice-only flows
+- Walk-and-talk mobile mode: large transcript view, big mic button, hands-free
+- Hands-free mode for accessibility — also serves users in driving / commute contexts
+
+**Vertical-aware behaviors.**
+
+- Beauty / flowers: voice-driven gift requests are natural ("send my mom roses for her birthday")
+- Jewelry: voice for the discovery flow is harder (visual product comparison matters); offer voice-to-text composer, text-back response
+- Home: voice while moving around the house ("does this couch fit my living room")
+
+**Files to touch / create.**
+
+- `extensions/chat-bubble/assets/components/VoiceComposer.js` — mic affordance + transcription
+- `app/services/voice/tts.js` — TTS provider (browser-native first, fallback to ElevenLabs/Google/Amazon Polly)
+- `app/routes/chat.jsx` — accept voice transcript with confidence score
+- Admin: voice mode toggle + voice picker
+
+**Acceptance criteria.**
+
+- [ ] Mic affordance respects browser permission flow
+- [ ] Transcription accuracy ≥85% on quiet environments, English
+- [ ] Voice + text input can be mixed in one session
+- [ ] TTS playback is interruptible by tapping mic or sending text
+- [ ] Reduced-motion / accessibility paths covered
+- [ ] Disabled by default; merchant opts in
+
+---
+
+### F24 — Logistics & fulfillment intelligence — `P1`
+
+**Why.** Today the assistant doesn't know about local pickup, scheduled delivery, international duties, or carbon footprint. These are *common* shopper questions that drive either delight (when answered well) or hand-off (when not).
+
+**What it does.**
+
+- **BOPIS** — for merchants with multi-location inventory, check stock at nearby stores given shopper ZIP; offer "Pick up at {store} today"
+- **Curbside / scheduled delivery** — when the merchant supports it, let the shopper schedule a window
+- **International tax/duty calculation** — for cross-border shoppers, surface estimated duties before checkout (avoids the post-purchase surprise)
+- **Carbon footprint per option** — when delivery has multiple speed options, surface the carbon footprint of each as a soft nudge toward slower/greener choices (merchant opts in)
+- **Customs / restricted items** — flag if a product can't be shipped to the shopper's country before they get to checkout
+- **Address validation** — catch obvious typos before checkout
+
+**Vertical-aware behaviors.**
+
+- Home / furniture: white-glove vs. curbside trade-off surfaced; freight quote inline for large items
+- Flowers: delivery date is the central concern (already in F18); BOPIS for local florist shops
+- Beauty / small items: standard parcel by default; carbon-conscious option for eco-positioned merchants
+- Electronics: high-value-item insurance and signature-required surfaced
+
+**Files to touch / create.**
+
+- `app/services/fulfillment/{bopis,scheduling,duties,carbon}.js`
+- Adapter pattern for merchant fulfillment apps (Shopify Inventory, ShipStation, Easyship, Zonos)
+- `app/services/flows/fulfillment.js` — tools to query store inventory, calculate duties, schedule delivery
+- Admin: configure available fulfillment options + carbon disclosure on/off
+
+**Acceptance criteria.**
+
+- [ ] BOPIS query against a multi-location merchant returns stock + distance + pickup hours
+- [ ] Cross-border shopper sees estimated duty/tax before checkout (when merchant has duty calculation enabled)
+- [ ] Scheduled-delivery windows pulled from merchant's scheduling app
+- [ ] Restricted item to shopper's country → flagged with alternative
+- [ ] Carbon footprint disclosure shown when merchant opts in; never aggressive
+
+---
+
+### F25 — Loyalty, rewards, gift cards & referrals — `P1`
+
+**Why.** Loyalty programs are widely deployed (Smile.io, Yotpo Loyalty, LoyaltyLion) but invisible to the chat assistant today. Surfacing tier benefits and points balances at the right moment is a high-leverage conversion lever ("$15 more for free shipping AND you'd hit Gold tier next purchase").
+
+**What it does.**
+
+- **Show points balance** for authenticated shoppers
+- **Tier-aware framing** — "You're $30 from Gold tier; this purchase puts you over"
+- **Redeem points on cart** — apply redemption tiers inline
+- **Gift card balance lookup** — by code or by authenticated wallet
+- **Gift card application** at checkout
+- **Refer-a-friend nudge** — at the right moment (post-purchase, post-recommendation acceptance), generate referral link
+
+Adapter pattern for major loyalty apps: **Smile.io, Yotpo Loyalty & Referrals, LoyaltyLion, Stamped Loyalty**.
+
+**Vertical-aware behaviors.**
+
+- Beauty / replenishable: tier benefits motivate the subscription upsell ("Members get 20% off subscriptions")
+- Jewelry / high-AOV: gift-card-as-engagement-strategy (give a card, schedule reveal)
+- Flowers: referrals fit social occasions ("forward a $20 credit to a friend after sending flowers")
+
+**Files to touch / create.**
+
+- `app/services/loyalty/{adapter,smile,yotpo,loyaltylion,stamped}.js`
+- `app/services/flows/loyalty.js` — tools for balance, redeem, tier-check, gift-card-balance, gift-card-apply
+- Admin: loyalty-app picker; gift-card-system picker
+
+**Acceptance criteria.**
+
+- [ ] Authenticated shopper sees points balance inline when relevant
+- [ ] Tier-threshold awareness in cart-summary card
+- [ ] Gift card code accepted at checkout; balance shown
+- [ ] Refer-a-friend opt-in nudge fires at most once per conversation
+- [ ] Adapter swap works without code changes
+
+---
+
+### F26 — Cross-channel & cross-device continuity — `P2`
+
+**Why.** Shoppers don't shop in one channel. Email comes in, they switch to mobile, they return to desktop. Today every visit starts a fresh conversation. Continuity creates a sense of relationship; ShopLC's iAdvize integration doesn't have this either, but Klarna does across mobile/web.
+
+**What it does.**
+
+- **Cross-device** — authenticated shoppers' conversations sync across devices (already partly there via DB persistence; surface via UX)
+- **Email continuation** — if a shopper closes the browser mid-conversation, with consent + email captured, send a recap email with a deep link to resume on any device
+- **SMS continuation** (opt-in) — for shoppers who provide phone, follow up via SMS
+- **Notification preferences** — granular shopper controls (price drop, back-in-stock, saved-cart, replenishment)
+- **Conversation history view** — the shopper can see and download their conversation history (privacy + transparency)
+
+**Vertical-aware behaviors.**
+
+- All packs: same continuity logic; the messages themselves are vertical-aware (already in the pack)
+- Flowers / sympathy: never SMS sympathy follow-ups; respect the sensitivity
+
+**Files to touch / create.**
+
+- `app/services/continuity/{email,sms,deeplink}.js`
+- Email templating (transactional via existing email provider from F12)
+- SMS via Twilio or merchant's preferred provider (adapter)
+- `prisma/schema.prisma` — `ContinuityChannel`, `NotificationPreference` models
+- Admin: shopper-facing notification-prefs surface
+
+**Acceptance criteria.**
+
+- [ ] Logged-in shopper sees their conversation history when they reopen on a different device
+- [ ] Email recap can be opt-in triggered after 10 min idle; deep link resumes session
+- [ ] SMS requires explicit opt-in (TCPA / GDPR compliance)
+- [ ] Notification prefs surface in the chat menu; granular per channel
+- [ ] Sympathy context blocks SMS / email follow-ups
+
+---
+
+### F27 — Collaborative shopping & shared carts — `P2`
+
+**Why.** Many purchases are joint decisions (couple buying furniture, parents buying for a teen, family group-ordering). Today each shopper acts solo. iAdvize doesn't have this; it's a real differentiation lane.
+
+**What it does.**
+
+- **Share cart link** — generate a shareable URL that opens the cart on someone else's device; useful for "show this to my partner"
+- **Joint decision flow** — Shopper A starts a conversation, shares a cart with Shopper B for input; the assistant routes follow-up questions and decisions to A (the buyer) or B (the consulted partner) with clear attribution
+- **Group ordering** — for office/event purchases, multiple shoppers add to a shared cart with attribution; one designated payer
+- **Gift mode** — when buying as a gift, hide cart contents from recipient view (don't email recipient pre-arrival)
+
+**Vertical-aware behaviors.**
+
+- Home / furniture: joint decisions are the norm
+- Jewelry (gift): hide recipient from cart/receipt content
+- Flowers (events): group orders for office collections
+- Fashion (group orders for events): bridal party, team merch
+
+**Files to touch / create.**
+
+- `app/services/collaboration/sharedCart.js`
+- `app/routes/cart.share.[id].jsx` — shared-cart deep-link route
+- `prisma/schema.prisma` — `SharedCart`, `SharedCartParticipant`
+- Widget: share-cart card, joint-decision attribution UI
+
+**Acceptance criteria.**
+
+- [ ] Shopper can generate a share link from any cart; opening on another device shows same items
+- [ ] Joint-decision: both participants can see the conversation; attribution clear
+- [ ] Gift mode hides cart from recipient view (recipient sees a delivery confirmation only)
+- [ ] Group order with 5+ participants tested end-to-end
+
+---
+
+### F28 — End-to-end gift workflow — `P2`
+
+**Why.** Gift-buying is the highest-anxiety shopping context. Our F2 Gift Finder flow finds the product; we don't help with everything *after* the find: wrap, message, schedule, surprise, remind for next year. iAdvize doesn't do this; Amazon Rufus does some of it.
+
+**What it does.**
+
+- **Gift wrapping** selection (free vs. paid options the merchant offers)
+- **Personalized message** — typed by shopper or AI-suggested in the right tone (anniversary, sympathy, birthday)
+- **Delivery date scheduling** — confirm arrival on the day, not days before, not days after
+- **Surprise mode** — don't email recipient pre-arrival (already mentioned in F27)
+- **Calendar memory** (opt-in) — "Remember to suggest a gift for {recipient} next year"
+- **Standing gift** — "Send my mom flowers every year on May 12" — set-and-forget; assistant confirms each year before sending
+
+**Vertical-aware behaviors.**
+
+- Jewelry: high-stakes gifts; assistant suggests gift packaging and presentation moments
+- Flowers / beauty: most common gift verticals; standing-gift offer is highest-value
+- Home / electronics: rare as gifts; flow is shorter
+
+**Files to touch / create.**
+
+- `app/services/flows/gift.js` — gift-workflow orchestration
+- `prisma/schema.prisma` — `StandingGift`, `CalendarReminder`
+- Email scheduling for standing-gift confirmations
+- Widget: gift-mode card, message-suggestion card, calendar-confirmation card
+
+**Acceptance criteria.**
+
+- [ ] Gift Finder flow optionally chains into wrap → message → schedule → surprise
+- [ ] AI-suggested gift messages respect tone (sympathy ≠ birthday)
+- [ ] Standing gift: assistant sends a confirmation 5 days before scheduled delivery; shopper can skip / modify
+- [ ] Calendar memory requires explicit opt-in (privacy)
+- [ ] Recipient never receives a "your gift is on the way" email if surprise mode is on
+
+---
+
+### F29 — Pricing & availability intelligence — `P2`
+
+**Why.** Klarna's edge is pricing data — 400M price points, historical pricing. Shoppers ask "is this a good price?" or "should I wait for a sale?" — we currently can't answer either. F18 covers stock; this covers price.
+
+**What it does.**
+
+- **Price history** — surface the product's price trajectory over the last 90 days (merchant-internal data; we already have this if we log it)
+- **Discount detection** — recognize when a product is currently discounted from its baseline and call it out
+- **Price drop subscription** — opt-in to be notified when a watched item drops below a threshold
+- **"Is this a good price?"** — answer based on the product's own history (don't compare to other merchants; that's a category we shouldn't enter)
+- **Restock prediction** — based on historical restock cadence, estimate "usually back within X weeks"
+
+**Vertical-aware behaviors.**
+
+- All packs: price history matters; the threshold for "good price" framing varies (luxury jewelry: discount is suspicious; fast fashion: discounts are the norm)
+- Flowers: pricing is occasion-dependent, not historical
+- Electronics: shoppers are most price-sensitive; this is the highest-impact pack
+
+**Files to touch / create.**
+
+- `app/services/pricing/{history,detection,prediction}.js`
+- Background job: snapshot product prices daily into `PriceHistory`
+- `prisma/schema.prisma` — `PriceHistory`, `PriceDropSubscription`
+- `app/services/flows/pricing.js` — tools to query history, detect drops, subscribe
+
+**Acceptance criteria.**
+
+- [ ] After 30 days of daily snapshots, the assistant can show a 30-day price history when asked
+- [ ] Currently discounted products are noted ("On sale — down from $X")
+- [ ] Price drop subscription captures email + threshold; email fires when threshold crossed
+- [ ] Restock prediction has confidence indicator (don't promise dates we can't keep)
+
+---
+
+### F30 — Smart bundles & dynamic packaging — `P2`
+
+**Why.** Today upsell (F5) suggests one or two complements. Smart bundles is a step further — the assistant proposes a curated bundle ("the starter routine" for beauty, "the engagement set" for jewelry, "the dorm room kit" for home/electronics) at a small discount to the sum-of-parts. Increases AOV without feeling pushy.
+
+**What it does.**
+
+- AI-generated bundles based on cart composition, shopper profile, and pack-specific bundle rules
+- Threshold awareness — surface "$X more for free shipping" or "$Y more for Gold tier"
+- Build-your-own-bundle UI — shopper assembles a bundle from a curated pool of compatible items
+- Bundle pricing — merchant can configure auto-discount thresholds (e.g., "$5 off bundles of 3+ care items")
+
+**Files to touch / create.**
+
+- `app/services/flows/bundle.js`
+- Per-pack bundle templates: `app/services/packs/{pack}/bundles.js`
+- Widget: bundle card, build-your-own UI
+
+**Acceptance criteria.**
+
+- [ ] Cart with starter skincare item → bundle suggestion of full routine
+- [ ] Free-shipping threshold awareness fires at the right moment, with the right delta
+- [ ] Build-your-own bundle UI accepts 2–6 items; respects category compatibility
+- [ ] Bundle discount applied automatically if merchant configured one
+
+---
+
+### F31 — Out-of-catalog awareness & substitution — `P2`
+
+**Why.** A common failure mode of generic assistants: they pretend to find a product the merchant doesn't carry. Hallucinated catalog is worse than honest absence. Rufus handles this well; we don't.
+
+**What it does.** When the shopper asks for a product / brand / model the merchant doesn't stock:
+
+- Acknowledge honestly ("We don't carry {brand X} at {shop name}")
+- Suggest comparable in-catalog alternatives ("Here are three pieces in a similar style and price range")
+- Optionally log the request — merchants get a "frequent unfulfilled requests" report to inform purchasing decisions
+
+**Vertical-aware behaviors.**
+
+- All packs: same pattern; the comparable suggestions vary by pack expertise (jewelry pack matches on metal/stone/style; electronics pack matches on specs/use case)
+
+**Files to touch / create.**
+
+- `app/services/flows/substitution.js` — tool `find_substitutes(query_attributes)`
+- `app/prompts/base.md` — instruct against hallucinated catalog presence
+- Admin analytics: "Unfulfilled product requests" report
+- `prisma/schema.prisma` — `UnfulfilledRequest`
+
+**Acceptance criteria.**
+
+- [ ] Shopper asks for a brand the catalog doesn't have → assistant says so + offers 3 alternatives
+- [ ] Assistant never claims to have a product not in catalog
+- [ ] Unfulfilled requests appear in admin analytics with frequency counts
+
+---
+
+### F32 — Agentic commerce protocol support (strategic future-proofing) — `P3` (P2 if signals strengthen)
+
+**Why.** McKinsey forecasts $900B–$1T US retail from agentic commerce by 2030. Klarna joined Google's UCP (Feb 2026) and Stripe's SPT (March 2026). External AI agents — not the shopper — will increasingly *be the buyer*. Our app today is shopper-facing only. To be future-proof, the merchant's catalog and checkout should be discoverable to external AI shoppers via standard protocols.
+
+**Two-sided architecture:**
+
+1. **Shopper-facing assistant** — what F1–F31 build (the human's conversational partner)
+2. **Agentic interface** — what F32 builds (the *external AI's* programmatic interface to this merchant)
+
+**What it does.**
+
+- **MCP server exposure** — the merchant's catalog and checkout exposed via discoverable MCP endpoints (we're already a *client* of Shopify MCP; F32 makes the merchant a *server* of MCP to external agents)
+- **Google UCP (Universal Commerce Protocol)** compliance — register the merchant's catalog with UCP discovery
+- **Stripe SPT (Shopping Protocol Toolkit)** integration — when standardized
+- **Agentic shopper authentication** — distinguish "human shopper using our assistant" vs. "external agent acting on behalf of a human"
+- **Agentic analytics** — separate dashboard for agent-driven traffic vs. human traffic; conversion model differs
+
+**Riskiest assumption.** That the three protocols (Klarna's, UCP, SPT) don't consolidate into one, or that one wins decisively. The cheapest hedge is to expose MCP first — we're already an MCP client, so we know the surface — and add UCP/SPT as adapters once one or both stabilize.
+
+**Files to touch / create.**
+
+- `app/services/agentic/mcp-server.js` — expose our merchant's catalog via MCP server endpoints
+- `app/services/agentic/ucp-adapter.js` — Google UCP adapter
+- `app/services/agentic/spt-adapter.js` — Stripe SPT adapter (when API stabilizes)
+- `app/routes/api.agentic.[protocol].jsx` — protocol-specific routes
+- Admin: agentic commerce dashboard (separate from F11 human-shopper analytics)
+- Auth: agent-identification tokens
+
+**Acceptance criteria.**
+
+- [ ] MCP server endpoint exposes search / cart / checkout tools for external clients
+- [ ] External MCP client can browse the merchant's catalog
+- [ ] UCP adapter registers the merchant with Google's commerce discovery (when available)
+- [ ] Agentic-driven orders are tagged distinctly in analytics
+- [ ] Default state is OFF; merchant opts in (risk of unwanted AI traffic until proven)
+
+---
+
+### F33 — Sustainability & ethics surfacing — `P3`
+
+**Why.** A growing shopper segment wants sustainability data: carbon footprint, sourcing, recyclability. Smaller-than-mainstream but disproportionately influential. Easy differentiator if the merchant has the data.
+
+**What it does.**
+
+- Pull product-level sustainability data from merchant metafields (carbon, materials, certifications)
+- Surface in product cards when present ("Made in {country} · {material} · {certification}")
+- Carbon footprint per delivery option (cross-references F24)
+- Donation/charity option at checkout if merchant has integration
+
+**Files to touch / create.**
+
+- Convention for sustainability metafields (`namespace=sustainability`)
+- Pack-specific surfacing rules
+- Widget: subtle badges on product cards
+
+**Acceptance criteria.**
+
+- [ ] Products with sustainability metafields show subtle badges on cards
+- [ ] Carbon disclosure on delivery options (when F24 carbon enabled)
+- [ ] Charity option visible at checkout (when merchant configured one)
+- [ ] No greenwashing — only surface what merchant has actually documented
+
+---
+
+### F34 — Trend, seasonality, and drop awareness — `P3`
+
+**Why.** Shopping is calendar-driven. Mother's Day, holiday season, drops, limited editions. Today the assistant is calendar-blind.
+
+**What it does.**
+
+- Aware of upcoming holidays in the shopper's locale (US Mother's Day in May, Diwali in India, etc.)
+- Proactively surface seasonal collections when the shopper is browsing related categories
+- Drop/launch notification opt-in
+- "Wait for sale?" guidance — based on the merchant's historical discount pattern (Sept/Black Friday norms)
+- Trend-aware recommendations within the catalog
+
+**Files to touch / create.**
+
+- `app/services/calendar/holidays.js` — locale-aware holiday calendar
+- `app/services/flows/seasonality.js`
+- `prisma/schema.prisma` — `DropSubscription`
+
+**Acceptance criteria.**
+
+- [ ] Approaching Mother's Day (US locale) → assistant surfaces gift collection when shopper engages
+- [ ] Drop notification opt-in available on PDPs of pre-order / limited-edition items
+- [ ] Locale-aware (Diwali for IN shoppers, not US shoppers)
+
+---
+
+### F35 — B2B / wholesale & business-account mode — `P3`
+
+**Why.** Many Shopify merchants run B2B alongside DTC. The assistant currently can't handle quantity-based pricing, quote requests, net terms, or business-account workflows. We don't need to ship full B2B in v1, but we should reserve the architecture.
+
+**What it does.**
+
+- Detect business-account shoppers (via customer tag / segment)
+- Apply tiered pricing per quantity
+- Offer quote-request flow for >100-unit orders (handoff to merchant's B2B team)
+- Surface net-terms options if merchant supports
+- VAT / business-account fields in checkout
+- Reorder via PO
+
+**Files to touch / create.**
+
+- `app/services/b2b/{tieredPricing,quote,netTerms}.js`
+- `prisma/schema.prisma` — `BusinessAccount`, `QuoteRequest`
+- Admin: B2B mode toggle + segment mapping
+
+**Acceptance criteria.**
+
+- [ ] Business-segment shopper sees tiered pricing in product cards
+- [ ] Order >100 units triggers quote request flow (with handoff)
+- [ ] Net-terms shoppers see net-30 / net-60 options when configured
+- [ ] B2B mode disabled by default
+
+---
+
+### F36 — Shopify-native data & API expansion — `P0` (UCP migration is time-critical)
+
+**Why.** The current implementation taps a thin slice of the Shopify MCP / Admin / Storefront API surface — basically catalog search, cart, policies, and customer orders. Shopify exposes far more: live inventory, metafields, discount codes, draft orders, Markets, Functions. Tapping these unlocks the next class of shopper queries ("how many are left?", "any deals?", "is this available in my country?", "what are the ingredients?") and brings the assistant from "informed about products" to "informed about *this merchant's reality.*"
+
+**Time-critical sub-feature: UCP migration.** Shopify's Storefront Catalog MCP migrated to UCP (Universal Commerce Protocol) in 2026. The tool name `search_shop_catalog` is deprecated; UCP-conformant names are `search_catalog`, `lookup_catalog`, `get_product`. **Old tool names are maintained only until June 15, 2026.** Our `app/services/config.server.js` and `app/services/tool.server.js` reference the deprecated name today — they must be migrated before that cutoff.
+
+**What it does** (consolidated capability set):
+
+1. **UCP migration** — rename references from `search_shop_catalog` → `search_catalog`, adopt `lookup_catalog` and `get_product` UCP tools. Cart and policies tools (`get_cart`, `update_cart`, `search_shop_policies_and_faqs`) live on a separate non-UCP endpoint and stay unchanged.
+2. **Live inventory awareness** via Admin API `InventoryLevel` queries (`available`, `on_hand`, `incoming`, `committed` states). Powers "how many left?", "when restocking?", scarcity displays, OOS predictions.
+3. **Metafield-driven enrichment** — read product metafields (`metafields.{namespace}.{key}`) and surface them in product cards and answers. Common namespaces: `nutrition`, `ingredients`, `materials`, `sourcing`, `certifications`, `care`, `dimensions`, `warranty`. Pack-aware mapping: each pack declares which namespaces it reads (jewelry → `metals`, `stones`, `treatments`; beauty → `ingredients`; home → `dimensions`, `materials`; flowers → `seasonality`, `pet_safety`; etc.).
+4. **Discount code intelligence** — read discount codes available to a shopper, auto-apply eligible automatic discounts, suggest stacking-compatible codes. Built on the Admin Discount API and Shopify Functions for discount validation. Critical migration note: **Shopify Scripts are deprecated June 30, 2026** — any discount logic must use Functions.
+5. **Shopify Markets awareness** — region-aware pricing, currency formatting, language detection, restricted-item awareness (this product can't ship to your country), localized shipping options.
+6. **Shopify Product Recommendations API** — leverage Shopify's native rec engine for "you might also like" baseline; pack-specific recs (F2, F5, F30) layer on top.
+7. **Draft orders** — generate a Shopify draft order inline for custom requests (F12 handoff), B2B quotes (F35), or pre-checkout cart preview with full tax/shipping calculation.
+8. **Shopify Customer Tags / Segments awareness** — read customer tags to drive segment-specific behavior (B2B, VIP, recovery campaigns); merchant configures the tag → behavior mapping in admin.
+9. **Shopify Collections** as a navigation surface — "show me from the {collection_name} collection", "what's in the bridal collection?".
+10. **Shopify Web Pixels** — for attribution beyond the in-house tracking in F11.
+
+**Vertical-aware behaviors.**
+
+- **Jewelry:** metafields surface metal purity, stone certifications, treatments; inventory used for one-of-a-kind / limited-edition pieces.
+- **Fashion:** metafields surface fabric content, fit type, country of origin; inventory at variant level (size × color) is critical.
+- **Footwear:** inventory by size × width; metafields for drop, weight, last shape.
+- **Electronics:** metafields for full spec sheet; inventory and lead-time for pre-orders.
+- **Flowers:** metafields for seasonality, pet safety, allergen warnings; inventory + lead-time + delivery window are tightly coupled.
+- **Beauty:** metafields for ingredients, skin type, sensitivity; Markets-aware for regulatory differences.
+- **Home:** metafields for dimensions, materials, assembly; inventory for one-of-a-kind / floor-model items.
+
+**Files to touch / create.**
+
+- `app/services/config.server.js` — change `productSearchName: "search_shop_catalog"` → `"search_catalog"` (also handle alias for backwards compat during transition)
+- `app/services/tool.server.js` — update tool-name recognition to handle both old + new UCP names; deprecation log when old name is seen
+- `app/mcp-client.js` — register `lookup_catalog` and `get_product` as known UCP tools
+- `app/services/shopify/` (new directory) — wrappers per capability:
+  - `inventory.js` — Admin API InventoryLevel queries
+  - `metafields.js` — metafield read + per-pack mapping
+  - `markets.js` — locale / currency / region awareness
+  - `discounts.js` — read codes, auto-apply, validate
+  - `draftOrders.js` — create draft order for quote / custom / preview
+  - `customerTags.js` — read tags, segment routing
+  - `collections.js` — list/lookup collections
+  - `recommendations.js` — Shopify native rec engine
+- `app/services/packs/{pack}/metafield-map.js` — per-pack metafield namespace declarations
+- `app/routes/chat.jsx` — register these as tools the LLM can call
+- Admin: per-merchant config for metafield namespace mapping (auto-detect when possible)
+
+**Acceptance criteria.**
+
+- [ ] By June 15, 2026: all calls to the catalog MCP use `search_catalog` (UCP); old `search_shop_catalog` references are removed; smoke test catalogs from a UCP-conformant Shopify shop
+- [ ] "How many left?" on a PDP returns a real number from `InventoryLevel.available`
+- [ ] Jewelry product with a `stone.certification` metafield surfaces it on the card and in answers
+- [ ] Cross-border shopper sees restricted-item warning before adding to cart
+- [ ] Discount code applied at cart automatically when shopper qualifies
+- [ ] Draft order generated for a custom-jewelry handoff; merchant team can convert it to a real order with one tap
+- [ ] Customer tagged `VIP` sees VIP-segment greeting and access to early-drop collections
+- [ ] Asking "show me from {collection}" returns products from that collection only
+- [ ] Discount logic uses Shopify Functions (not Scripts); merchants on legacy Scripts are warned in admin before June 30, 2026
+
+---
+
+### F37 — Buy-timing & deal intelligence ("Is it the right time to buy?") — `P1`
+
+**Why.** This is the highest-impact *trust-building* query class — and it's the user-stated example for this addition. Shoppers want guidance on timing (now vs. wait), and the assistant has the data to answer honestly: live discount status, price history (F29), inventory scarcity (F18/F36), historical sale cadence, restock prediction, model-lifecycle signals. Today the assistant has none of this synthesized into a coherent answer.
+
+**What it does.** When the shopper signals timing intent — "should I buy now or wait?", "is this a good price?", "any deals?", "is the new version coming soon?", "is this selling out?" — the assistant calls a composite `evaluate_buy_timing` tool that fuses six signals into a confident, honest answer:
+
+1. **Current discount status** — is this product currently discounted from its 90-day baseline? (Data source: F29 `PriceHistory` + F36 discount codes API)
+2. **Historical sale cadence** — does this merchant run a regular sale (Black Friday, end-of-season, weekly Drop)? When was the last sale? (Data: F29 `PriceHistory` analyzed for repeating drops)
+3. **Inventory scarcity** — how many units are left? Is this selling fast? (Data: F36 Admin API `InventoryLevel` + recent ATC velocity)
+4. **Restock signals** — if OOS or low: is it expected back? Based on past restock pattern (Data: F18 + F36)
+5. **Model lifecycle** — for product lines with versions (electronics most clearly, fashion seasons too): is the next version expected soon? (Data: merchant-configurable hints in admin OR vendor release-date metafield)
+6. **Personal context** (when shopper opted into memory per F20) — is this a replenishment? Did they wait last time?
+
+**The composite answer.** The assistant produces one of these honest framings:
+
+- **"Buy now"** — currently discounted *and* selling fast *and* no obvious sale coming. With reasoning.
+- **"Probably safe to wait"** — no current discount, historical pattern suggests a sale within X weeks, plenty in stock. With the prediction confidence.
+- **"Decide on your timeline"** — when the data doesn't point clearly either way. List the relevant factors.
+- **"Honest unknown"** — when the data is too sparse (new product, no history). Say so.
+
+The assistant **never invents urgency.** "Only 3 left!" only when `available <= 3` is actually true. "This usually sells out by end of week" only when the velocity data supports it. Fake scarcity is a brand killer.
+
+**Vertical-aware behaviors.**
+
+- **Electronics:** model lifecycle is dominant — "is the new MacBook coming soon?" matters most
+- **Fashion / footwear:** seasonal sale cadence + end-of-season patterns dominate
+- **Jewelry:** sale cadence less relevant (luxury rarely discounts heavily); scarcity + custom-order lead-time dominate
+- **Flowers:** timing is occasion-driven (will it arrive in time?) not sale-cycle-driven — F37 routes flowers timing queries to F24 logistics instead
+- **Beauty:** replenishment timing is the main "should I buy now?" use case — fold into F20 replenishment
+- **Home:** lead time + restocking dominate; sale cadence varies wildly by merchant
+
+**Discount intelligence sub-features:**
+
+- **Auto-detection of stackable codes** — if a shopper's cart qualifies for multiple discounts, the assistant identifies the best combination
+- **Code suggestion** — if a code is publicly listed but the shopper hasn't applied it, surface it ("There's a $20 off code for orders over $100 — want me to apply it?")
+- **First-time-shopper code** — if merchant has a welcome-discount and shopper is new (no past order), surface it
+- **Loyalty-tier-locked deals** — surface tier-aware perks ("Gold members get 15% off this collection — you're $30 away")
+- **Personalized codes (merchant-policy-gated)** — for hesitating high-value shoppers, the assistant can generate a one-time discount code (created via Admin Discount API), subject to merchant-configured guardrails (max value, cooldown, eligible products). **Off by default — merchant explicitly opts in.**
+
+**Files to touch / create.**
+
+- `app/services/flows/buyTiming.js` — `evaluate_buy_timing(product_id)` tool
+- `app/services/shopify/discounts.js` — already in F36; extend for stacking-detection, personalized-code generation
+- `app/services/shopify/inventory.js` — extend with velocity tracking (use F11 analytics events to track ATC rate per product)
+- `prisma/schema.prisma`:
+  ```
+  model ProductVelocity {
+    id           String   @id @default(cuid())
+    shop         String
+    productId    String
+    variantId    String?
+    addsToCart24h Int     @default(0)
+    purchases24h  Int     @default(0)
+    views24h      Int     @default(0)
+    snappedAt    DateTime @default(now())
+    @@index([shop, productId, snappedAt])
+  }
+
+  model SaleCycle {
+    id             String   @id @default(cuid())
+    shop           String
+    productId      String?  // null = shop-wide cycle
+    collectionId   String?
+    detectedPattern String  // JSON: { cadence: "weekly|monthly|seasonal|holiday", typical_depth_pct: number, last_seen: date }
+    confidence     Float
+    updatedAt      DateTime @updatedAt
+    @@index([shop])
+  }
+
+  model PersonalizedCodeIssuance {
+    id          String   @id @default(cuid())
+    shop        String
+    conversationId String?
+    customerId  String?
+    code        String
+    valuePct    Float?
+    valueAmount Float?
+    expiresAt   DateTime
+    redeemed    Boolean  @default(false)
+    redeemedAt  DateTime?
+    createdAt   DateTime @default(now())
+    @@index([shop, customerId])
+  }
+  ```
+- Admin: "Buy-timing intelligence" panel — toggle which signals are surfaced, threshold for "selling fast" badge, threshold for personalized codes (max %, max value, daily budget per shop)
+
+**Acceptance criteria.**
+
+- [ ] Shopper asks "is this a good time to buy?" → composite tool fires; response is one of the four framings; cited reasoning is real
+- [ ] Currently-discounted item is recognized and surfaced ("Down from $X — this is the lowest in 90 days")
+- [ ] "Selling fast" badge only fires when actual velocity data supports it (no synthetic scarcity)
+- [ ] Historical-sale-cadence detection requires ≥2 occurrences of a comparable pattern; otherwise "I don't have enough sale history to predict"
+- [ ] Restock prediction includes confidence ("usually back within 2 weeks" only when ≥3 historical restock samples)
+- [ ] First-time shopper with welcome-code-eligible cart sees the code surfaced
+- [ ] Stackable codes detected when present; best combination applied
+- [ ] Personalized code issuance is OFF by default; when ON, respects merchant guardrails (max %, daily budget, cooldown per shopper)
+- [ ] Flowers pack routes timing queries to F24 (delivery date) — not F37 (sale cycle)
+- [ ] Replenishment timing (beauty) routes to F20 — not F37
+
+---
+
 ## 9. Cross-cutting requirements
 
 ### Pack auto-detection on install (F15) is foundational
@@ -933,6 +1708,7 @@ Before each pack ships, run the pack's sample conversations (in its Appendix H s
 
 ### Phase 0 — Foundation (5–7 weeks)
 
+- **F36 — Shopify-native data & API expansion (UCP migration sub-feature is the highest-priority single ticket — must complete before June 15, 2026)**. The non-UCP sub-features (inventory, metafields, discounts, Markets, collections, Customer Tags) ship in Phase 0/1 incrementally as the other features need them.
 - F1 — Pack runtime (with **jewelry pack** as reference + **flowers pack** as second to prove the abstraction; flowers is the cleanest second pack: small scope, distinct vertical)
 - F2 — Discovery flows (gift + occasion + pack-specific flows for jewelry & flowers)
 - F3 — Size/fit (jewelry sizing)
@@ -941,7 +1717,7 @@ Before each pack ships, run the pack's sample conversations (in its Appendix H s
 - F14 — Logging skeleton
 - F15 — Auto-detection (for jewelry + flowers shops)
 
-**Exit criteria:** install on a jewelry design partner + a flowers design partner; both run conversations; both attribute orders; A/B confirms baseline-vs-pack lift on at least one.
+**Exit criteria:** install on a jewelry design partner + a flowers design partner; both run conversations; both attribute orders; A/B confirms baseline-vs-pack lift on at least one. **UCP migration complete and tested before June 15, 2026.**
 
 ### Phase 1 — Conversion & merchant control + 3 more packs (7–9 weeks)
 
@@ -951,12 +1727,17 @@ Before each pack ships, run the pack's sample conversations (in its Appendix H s
 - F9 — KB ingestion
 - F11 — Analytics dashboard expanded
 - F18 — Stock/lead-time intelligence
+- **F19 — Reviews & community Q&A synthesis** (Rufus-parity; high-leverage)
+- **F20 — Personalization & memory layer** (Rufus-parity; the differentiator beyond iAdvize)
+- **F22 — Post-purchase ops (modify, return, exchange, reorder)** (Octocom-parity; ops trust)
+- **F37 — Buy-timing & deal intelligence** ("Is it the right time to buy?" — composite of price history, sale-cycle detection, inventory scarcity, restock prediction, discount intelligence; depends on F36 data and F29 price history)
+- Remainder of F36 sub-features rolled in as other Phase 1 features need them (inventory for F18, metafields for F1 vertical packs, discounts for F37, Markets for F10, draft orders for F12/F35)
 - **+3 new packs**: fashion-apparel, footwear, electronics
 - Update F1/F2/F3 implementations to cover the new packs
 
-**Exit criteria:** 30-min onboarding works on each of 5 packs; A/B lift validated on a second pack.
+**Exit criteria:** 30-min onboarding works on each of 5 packs; A/B lift validated on a second pack; reviews synthesis demonstrably uses real review data, not hallucination; opt-in memory layer working with privacy controls; post-purchase ops live for at least one returns-app integration.
 
-### Phase 2 — Scale & differentiation (5–7 weeks)
+### Phase 2 — Scale & differentiation (6–8 weeks)
 
 - F5 — Upsell/cross-sell
 - F6 — Visual search
@@ -964,9 +1745,28 @@ Before each pack ships, run the pack's sample conversations (in its Appendix H s
 - F12 — Human handoff
 - F16 — Compare mode
 - F17 — Subscription guidance
+- **F21 — Conversational checkout completion** (experimental; merchant opt-in; A/B-gated)
+- **F24 — Logistics & fulfillment intelligence (BOPIS, scheduled delivery, duties)**
+- **F25 — Loyalty, rewards, gift cards & referrals**
+- **F26 — Cross-channel & cross-device continuity**
+- **F27 — Collaborative shopping & shared carts**
+- **F28 — End-to-end gift workflow**
+- **F29 — Pricing & availability intelligence**
+- **F30 — Smart bundles & dynamic packaging**
+- **F31 — Out-of-catalog awareness & substitution**
 - **+2 new packs**: beauty-skincare, home-furniture (the last 2 v1 packs)
 
-**Exit criteria:** AOV lift ≥10% on at least 3 packs; multi-language validated on non-EN design partner; visual search quality bar met; all 7 v1 packs production-ready.
+**Exit criteria:** AOV lift ≥10% on at least 3 packs; multi-language validated on non-EN design partner; visual search quality bar met; all 7 v1 packs production-ready; F21 conversational checkout A/B has no net-negative effect on the merchant who opts in; F25 loyalty integration live for at least one loyalty app.
+
+### Phase 3 — Future-proofing & adjacent surfaces (4–6 weeks; can slip without blocking GA)
+
+- **F23 — Voice mode** (P3 affordance; measure adoption, don't bet on it)
+- **F32 — Agentic commerce protocol support** (P3; MCP server exposure first, UCP/SPT adapters when standards stabilize)
+- **F33 — Sustainability & ethics surfacing**
+- **F34 — Trend, seasonality, and drop awareness**
+- **F35 — B2B / wholesale mode**
+
+**Exit criteria:** voice mode shipped behind merchant toggle with adoption metrics in dashboard; merchant can expose catalog to external MCP clients (toggle); sustainability badges visible on products with metafields; B2B segment routing works.
 
 ---
 
@@ -1120,6 +1920,242 @@ model BackInStockSubscription {
   notifiedAt  DateTime?
   @@index([shop, productId])
 }
+
+// ----- F19 Reviews -----
+
+model ReviewsAppConfig {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  appName   String   // "yotpo" | "loox" | "judgeme" | "stamped" | "okendo" | "none"
+  apiKey    String?
+  apiSecret String?
+  enabled   Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ----- F20 Personalization & memory -----
+
+model ShopperProfile {
+  id                String                     @id @default(cuid())
+  shop              String
+  customerId        String                     // Shopify customer ID
+  optedIn           Boolean                    @default(false)
+  optedInAt         DateTime?
+  storageMode       String                     @default("server") // "server" | "local"
+  lastSeenAt        DateTime?
+  attributes        ShopperProfileAttribute[]
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  @@unique([shop, customerId])
+  @@index([shop])
+}
+
+model ShopperProfileAttribute {
+  id               String          @id @default(cuid())
+  profileId        String
+  profile          ShopperProfile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  key              String          // "size_us_shoes", "preferred_metal", "allergies", "skin_type", etc.
+  value            String          // JSON-serializable
+  weight           Float           @default(1.0)
+  source           String          // "stated" | "inferred" | "purchase_history"
+  lastReinforcedAt DateTime        @default(now())
+  expiresAt        DateTime?       // for decay
+  createdAt        DateTime        @default(now())
+  @@index([profileId, key])
+}
+
+// ----- F22 Post-purchase ops -----
+
+model OrderOperation {
+  id             String   @id @default(cuid())
+  conversationId String
+  shop           String
+  orderId        String
+  operationType  String   // "modify_address" | "cancel" | "swap_variant" | "return" | "exchange" | "refund_status" | "reorder"
+  payload        String   // JSON
+  status         String   @default("requested") // "requested" | "succeeded" | "failed"
+  errorReason    String?
+  createdAt      DateTime @default(now())
+  @@index([shop, orderId])
+}
+
+model ReturnsAppConfig {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  appName   String   // "loop" | "returnly" | "aftership" | "shopify_native"
+  config    String   // JSON
+  enabled   Boolean  @default(false)
+}
+
+// ----- F25 Loyalty -----
+
+model LoyaltyAppConfig {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  appName   String   // "smile" | "yotpo_loyalty" | "loyaltylion" | "stamped_loyalty" | "none"
+  config    String   // JSON: api keys, tier mapping
+  enabled   Boolean  @default(false)
+}
+
+// ----- F26 Cross-channel continuity -----
+
+model NotificationPreference {
+  id             String   @id @default(cuid())
+  shop           String
+  customerId     String?
+  shopperEmail   String?
+  shopperPhone   String?
+  emailEnabled   Boolean  @default(true)
+  smsEnabled     Boolean  @default(false)
+  channels       String   // JSON: { price_drop, back_in_stock, saved_cart, replenishment }
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  @@unique([shop, customerId])
+}
+
+// ----- F27 Collaborative shopping -----
+
+model SharedCart {
+  id             String                 @id @default(cuid())
+  shop           String
+  ownerCustomerId String?
+  cartId         String
+  shareToken     String                 @unique
+  giftMode       Boolean                @default(false)
+  expiresAt      DateTime?
+  participants   SharedCartParticipant[]
+  createdAt      DateTime               @default(now())
+}
+
+model SharedCartParticipant {
+  id           String     @id @default(cuid())
+  sharedCartId String
+  sharedCart   SharedCart @relation(fields: [sharedCartId], references: [id], onDelete: Cascade)
+  role         String     // "buyer" | "consulted" | "viewer"
+  joinedAt     DateTime   @default(now())
+  identifier   String     // email or customerId
+}
+
+// ----- F28 Gift workflow -----
+
+model StandingGift {
+  id               String   @id @default(cuid())
+  shop             String
+  buyerCustomerId  String
+  recipientName    String
+  recipientAddress String
+  recurrenceRule   String   // RRULE string (RFC 5545)
+  productHints     String   // JSON
+  budgetCap        Float?
+  nextOccurrence   DateTime
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  @@index([shop, nextOccurrence])
+}
+
+model CalendarReminder {
+  id               String   @id @default(cuid())
+  shop             String
+  buyerCustomerId  String
+  occasionType     String   // "birthday" | "anniversary" | "custom"
+  occasionDate     String   // MM-DD for annual recurrence
+  recipientLabel   String
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  @@index([shop, buyerCustomerId])
+}
+
+// ----- F29 Pricing -----
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  shop       String
+  productId  String
+  variantId  String?
+  price      Float
+  currency   String
+  snappedAt  DateTime @default(now())
+  @@index([shop, productId, snappedAt])
+}
+
+model PriceDropSubscription {
+  id           String   @id @default(cuid())
+  shop         String
+  productId    String
+  variantId    String?
+  shopperEmail String
+  threshold    Float?   // notify when below this price
+  createdAt    DateTime @default(now())
+  notifiedAt   DateTime?
+  @@index([shop, productId])
+}
+
+// ----- F31 Out-of-catalog -----
+
+model UnfulfilledRequest {
+  id           String   @id @default(cuid())
+  shop         String
+  query        String
+  attributes   String?  // JSON
+  conversationId String?
+  createdAt    DateTime @default(now())
+  @@index([shop])
+}
+
+// ----- F32 Agentic commerce -----
+
+model AgenticClient {
+  id             String   @id @default(cuid())
+  shop           String
+  protocol       String   // "mcp" | "ucp" | "spt" | "custom"
+  clientId       String
+  clientName     String?
+  authorizedAt   DateTime @default(now())
+  lastSeenAt     DateTime?
+  ordersAttributed Int    @default(0)
+  @@index([shop, protocol])
+}
+
+// ----- F34 Trends -----
+
+model DropSubscription {
+  id           String   @id @default(cuid())
+  shop         String
+  productId    String?
+  collectionId String?
+  shopperEmail String
+  createdAt    DateTime @default(now())
+  notifiedAt   DateTime?
+  @@index([shop])
+}
+
+// ----- F35 B2B -----
+
+model BusinessAccount {
+  id             String   @id @default(cuid())
+  shop           String
+  customerId     String
+  segment        String   // "tier1_wholesale" | "tier2_wholesale" | "trade" | "education" | "custom"
+  netTermsDays   Int?     // 0 = pay now, 30 = net30
+  vatId          String?
+  poRequired     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  @@unique([shop, customerId])
+}
+
+model QuoteRequest {
+  id             String   @id @default(cuid())
+  shop           String
+  customerId     String?
+  conversationId String?
+  items          String   // JSON
+  quantity       Int
+  notes          String?
+  status         String   @default("open") // "open" | "quoted" | "accepted" | "declined"
+  createdAt      DateTime @default(now())
+  @@index([shop, status])
+}
 ```
 
 ---
@@ -1137,6 +2173,19 @@ model BackInStockSubscription {
 | Merchants will customize rather than abandon | Medium | 3 design-partner usability tests of admin before Phase 1 GA |
 | SQLite + sqlite-vec scales | Low-medium | Stress test: 1M chunks, p95 retrieval <100ms |
 | Attribution model isn't gamed | Low | Require ≥3 shopper messages before counting as "engaged" |
+| F19: reviews-app adapter coverage is sufficient for design partners | High | Top 5 adapters cover ~80% of Shopify mid-market reviews installs; verify with design partners before Phase 1 |
+| F20: shoppers will opt in to persistent memory at meaningful rates | High | Show value before asking; opt-in prompt only after the 3rd session and after the assistant has demonstrated useful behavior |
+| F20: persistent memory doesn't feel creepy | High | Plain-language "what the assistant knows about you" view; one-tap erase; conservative default copy |
+| F21: conversational checkout doesn't *hurt* conversion | Critical (if shipped) | Default OFF; A/B-gated; high-value carts always hand off to standard checkout |
+| F22: returns-app adapter coverage | Medium | Loop + Returnly cover the majority; AfterShip Returns + Shopify-native for the rest |
+| F23: voice mode is worth the implementation cost | Medium | Ship as P3 affordance; metric: % of conversations with ≥1 voice turn. If <5% after 90 days, deprioritize |
+| F25: loyalty integration is per-app and brittle | Medium | Adapter pattern; ship 2 adapters (Smile + Yotpo Loyalty) and prove the abstraction before adding more |
+| F26: SMS continuation hits TCPA / GDPR compliance | Medium | Explicit opt-in flow; double opt-in if jurisdiction requires; never SMS sympathy / funeral contexts |
+| F27: collaborative shopping is used at meaningful rates | Medium | Probably a long-tail feature; ship the share-cart link first (cheap), measure usage before building the joint-decision UI |
+| F29: price-history snapshots create meaningful insight | Low | 30 days of snapshots are enough for "is this a good price"; 90 days for "wait for sale?" |
+| F32: agentic commerce protocols (UCP, SPT) don't consolidate to one or disappear | High (strategic) | Expose MCP first (we know that surface); add UCP/SPT as adapters only once one stabilizes; merchant opt-in |
+| F32: agentic traffic doesn't degrade human shopper UX | Medium | Separate routes and rate limits for agent traffic; never block human shoppers due to agent load |
+| F34: locale-aware holiday calendar is correct | Low | Use a maintained library (date-holidays or similar); document supported locales |
 
 ---
 
@@ -1152,6 +2201,18 @@ model BackInStockSubscription {
 8. **Mixed-catalog UX** — single-pack-with-overrides vs. multi-pack-routing. Recommended: multi-pack-routing per PDP context; primary pack as fallback.
 9. **Pack distribution** — bundled in app code vs. dynamically loaded from a registry. Recommended: bundled in v1; registry comes if community packs ship.
 10. **Per-pack pricing** — does enabling more packs cost the merchant more? Recommended: no (one price, all packs available — auto-detection + admin selection determines usage).
+11. **F19 reviews adapter coverage** — which 5 reviews apps for v1? Recommended: Yotpo, Loox, Judge.me, Stamped, Okendo. Confirm against design-partner installs.
+12. **F20 memory storage mode default** — server-side (richer) vs. local-first (privacy-strongest). Recommended: server-side opt-in with shopper-facing erase; expose local-first as a merchant choice for high-privacy verticals (beauty / health-adjacent).
+13. **F20 memory opt-in moment** — after 3rd session vs. after first discovery flow completion vs. immediately. Recommended: after 3rd session — by then the shopper has experienced value.
+14. **F21 conversational checkout legitimacy** — does it harm trust? Run A/B on a low-risk merchant first; do not GA on a luxury / high-AOV merchant without further validation.
+15. **F22 returns-app priority** — which 2 returns adapters for v1? Recommended: Loop + Returnly. Add Shopify-native returns as a third (free option for merchants without a paid returns app).
+16. **F23 voice TTS provider** — browser-native, ElevenLabs, Google, Polly. Recommended: browser-native first (free, on-device), with ElevenLabs as the upgrade for merchants wanting brand-voice consistency.
+17. **F25 loyalty-app priority** — Recommended: Smile.io + Yotpo Loyalty as the first two adapters.
+18. **F26 SMS provider** — Twilio vs. merchant's preferred. Recommended: adapter pattern; ship Twilio as default.
+19. **F29 price snapshot frequency** — daily vs. on-change. Recommended: daily snapshots for products in active carts/wishlists; weekly for full catalog (cost balance).
+20. **F32 agentic protocol roll-out** — MCP first (we already understand it); UCP / SPT only after one stabilizes. Track which protocols our top-3 design-partner merchants are seeing in inbound agentic traffic.
+21. **F32 agentic auth model** — how do we distinguish "external AI agent" from "human shopper using their own AI tool"? Recommended: explicit agent registration + agent-type claims in the token; treat unregistered AI traffic as human-equivalent with rate limiting.
+22. **F35 B2B segmentation** — driven by Shopify Customer Tag vs. Shopify B2B feature (Plus only) vs. custom field. Recommended: Customer Tag for v1 (works on all Shopify plans).
 
 ---
 
@@ -4106,6 +5167,276 @@ For Claude Code to consider this section done:
 - [ ] Mobile widget honors safe-area insets and locks body scroll while open
 - [ ] Composer keyboard handling on iOS (Visual Viewport API) keeps input above keyboard
 - [ ] Smoke test: a full conversation from launcher click → welcome → discovery flow → product carousel → ATC → cart summary → checkout link runs without visual regressions
+
+---
+
+---
+
+## 23. Appendix J — Conversational Query Catalog
+
+This appendix enumerates the conversational queries the assistant must handle, grouped by intent category. Each row maps a query family (with example shopper phrasings) to (a) which feature owns it, (b) which Shopify-native tool or data source powers it, and (c) the canonical assistant response shape.
+
+This is the test matrix for Claude Code: every query in this catalog must produce a correct, non-hallucinated answer in the implementation. Use it as the smoke test before shipping each pack.
+
+The catalog is intentionally cross-pack — the same query should work on a jewelry shop or an electronics shop, with the pack supplying the vocabulary.
+
+### J.1 Catalog discovery
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Search by keyword | "Show me halo engagement rings under $4,000" | F1 + F36 | `search_catalog` (UCP) |
+| Search by attribute | "White gold rings with a round center stone" | F1 + F36 | `search_catalog` with attribute filter |
+| Browse a collection | "Show me from the bridal collection" / "What's in your skincare line?" | F36 (collections) | Admin API `collections` query |
+| New arrivals | "What's new this week?" | F36 | `search_catalog` sorted by `created_at` desc |
+| Best sellers | "What's selling best?" / "What's popular?" | F36 + F11 | `search_catalog` sorted by sales OR Shopify Recommendations API |
+| Trending | "What's trending right now?" | F37 + F36 | `ProductVelocity` table + Shopify Recommendations API |
+| Sale items | "Show me what's on sale" | F37 + F36 | `search_catalog` filtered by discounted status |
+| Recently viewed (memory) | "What was I looking at earlier?" | F20 | `ShopperProfile` browse history |
+| Recently purchased | "What did I buy last time?" | F22 | Customer MCP order history |
+
+### J.2 Product detail & education
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Material / ingredient | "What's this made of?" / "What's in this serum?" | F36 metafields | Metafield `materials` / `ingredients` |
+| Origin / sourcing | "Where is this made?" / "Is this ethically sourced?" | F36 metafields | Metafield `sourcing` / `country_of_origin` |
+| Certifications | "Is this GIA certified?" / "Is this organic certified?" | F36 metafields + safety rules | Metafield `certifications` — **refuse if not present** |
+| Care instructions | "How do I care for this?" | F9 KB + F36 metafields | Pack-specific knowledge file + metafield `care` |
+| Warranty | "What's the warranty?" | F9 KB + F36 metafields | Merchant policy KB + metafield `warranty` |
+| Vertical-specific knowledge | Jewelry: "14k vs 18k gold?" · Beauty: "Niacinamide + retinol together?" · Footwear: "Drop on this shoe?" | F1 pack knowledge | Pack domain knowledge file |
+| Reviews synthesis | "What do other buyers say?" / "Common complaints?" | F19 | Reviews adapter (Yotpo / Loox / Judge.me / Stamped / Okendo) |
+| Q&A | "Did anyone ask about washability?" | F19 | Reviews app Q&A endpoint |
+
+### J.3 Sizing & fit
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Sizing help | "What size should I get?" | F3 | Pack sizing advisor |
+| Brand calibration | "I'm a 10 in Nike — what in Brooks?" | F3 footwear pack | Brand calibration JSON |
+| Body / dimension fit | "I have a 12x14 room — will this fit?" | F3 home pack | Product metafield dimensions + room math |
+| Skin / sensitivity | "Will this irritate sensitive skin?" | F19 + F3 beauty pack | Reviews synthesis + ingredient KB |
+| Between sizes | "I'm between M and L — which?" | F3 fashion pack | Fit-type rule + fabric stretch lookup |
+
+### J.4 Pricing & buy-timing
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| **"Is it the right time to buy?"** | **"Should I buy now or wait?" / "Is this a good price?" / "Will it drop?"** | **F37** | **Composite: F29 PriceHistory + F36 inventory + SaleCycle detection** |
+| Lowest historical price | "What's the lowest this has been?" | F29 | `PriceHistory` |
+| Current discount | "Is this on sale?" | F37 + F36 | Product compare-at price + active discount codes |
+| Sale prediction | "When does this usually go on sale?" | F37 | `SaleCycle` pattern detection |
+| Price match | "Do you match competitor prices?" | F9 KB | Merchant policy in KB |
+| Price drop subscription | "Tell me when it drops" | F29 | `PriceDropSubscription` |
+
+### J.5 Inventory & availability
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| How many left | "How many are left?" | F36 + F37 | Admin API `InventoryLevel.available` |
+| Selling-fast signal | "Is this selling fast?" | F37 | `ProductVelocity` |
+| Restock prediction | "When will it be back?" | F18 + F36 | Historical restock cadence in `PriceHistory`/inventory log |
+| Variant availability | "Available in size 8 and brown?" | F36 | `search_catalog` variant filter |
+| Country availability | "Can I get this in Germany?" | F36 Markets | Shopify Markets restricted-item check |
+| Back-in-stock subscribe | "Notify me when back" | F18 | `BackInStockSubscription` |
+
+### J.6 Discounts & deals
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Any deals? | "What deals do you have?" / "Any discount codes?" | F37 | Admin Discount API + Functions |
+| Auto-apply best code | "Find me the best code for my cart" | F37 | Stack-detection logic |
+| Welcome / first-time | "Any first-time discount?" | F37 | Detect via customer order count |
+| Loyalty perks | "Member discounts?" | F25 + F37 | Loyalty adapter |
+| Personalized code (hesitating shopper) | (automated; not user-asked) — when shopper is hesitating at high-value cart with no codes | F37 + F7 | Personalized code issuance (admin opt-in) |
+| Free-shipping threshold | "How close to free shipping?" | F30 + F24 | Cart subtotal + shipping rule |
+
+### J.7 Shipping & delivery
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| When will it arrive? | "When will this arrive?" | F22 + F24 | Shopify order timeline + shipping rule |
+| In time for date? | "Will this arrive by Saturday?" | F24 | ZIP + cut-off + shipping calc |
+| Local pickup | "Can I pick this up nearby?" | F24 BOPIS | Shopify multi-location inventory |
+| Scheduled delivery | "Can I schedule for next Tuesday?" | F24 | Merchant scheduling app |
+| International / duties | "Will I pay duty?" | F24 + F36 Markets | Duty calculation via Markets / Zonos |
+| Carbon footprint | "What's the carbon impact?" | F24 + F33 | Merchant config (opt-in) |
+| Track | "Where's my order?" | F22 | Customer MCP order status |
+
+### J.8 Returns, exchanges, order ops
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Return policy | "Can I return this?" | F9 KB | Merchant return policy |
+| Initiate return | "I want to return my order" | F22 | Returns adapter (Loop / Returnly / AfterShip / Shopify-native) |
+| Initiate exchange | "Exchange for a different size" | F22 + F3 | Returns adapter + sizing advisor (drives exchange over refund) |
+| Modify shipping address | "Change my shipping address" | F22 | Admin API order edit (pre-ship only) |
+| Cancel order | "Cancel my order" | F22 | Admin API order cancel (pre-ship only) |
+| Reorder | "Reorder what I had last month" | F22 + F20 | Customer MCP order history + memory lookup |
+| Refund status | "Where's my refund?" | F22 | Admin API refund status |
+
+### J.9 Account, loyalty, gift cards
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Points balance | "How many points do I have?" | F25 | Loyalty adapter |
+| Tier benefits | "What do I get at Gold?" | F25 | Loyalty adapter tier-mapping |
+| Redeem points | "Use my points for this" | F25 | Loyalty adapter |
+| Gift card balance | "Check my gift card balance" | F25 | Shopify gift card API |
+| Apply gift card | "Use this gift card on my order" | F25 | Cart mutation |
+| Refer a friend | "How does referral work?" | F25 | Loyalty adapter referral endpoint |
+| Sign in / out | "Sign me in" / "Log me out" | F1 (auth) | Customer MCP OAuth |
+| What do you know about me? | "What does the assistant know about me?" | F20 | `ShopperProfile` view |
+| Erase my data | "Delete my history" | F20 + F36 privacy | Profile + conversation erasure |
+
+### J.10 Recommendations & gifts
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Gift recommendation | "Gift for my mom's birthday, $200" | F2 Gift Finder | Pack flow |
+| Engagement | "Help me pick an engagement ring" | F2 Engagement Wizard | Jewelry pack flow |
+| Birthstone | "What's my brother's birthstone?" | F2 Birthstone Match | Jewelry pack flow |
+| Fit | "Find my shoe fit" | F2 Shoe Fit Advisor | Footwear pack flow |
+| Routine | "Build me a skincare routine" | F2 Routine Builder | Beauty pack flow |
+| Outfit | "What goes with this blazer?" | F2 Outfit Builder | Fashion pack flow |
+| Room | "Will this couch fit my room?" | F2 Room Fit Advisor | Home pack flow |
+| Cross-sell | "What else do I need?" | F5 | Pack upsell rules |
+| Bundle | "Build me a starter set" | F30 | Bundle logic |
+| Subscription | "Set up monthly delivery" | F17 | Subscription adapter |
+| Personalized rec | "Based on what I've bought, what would I like?" | F20 + F36 | Profile + Shopify recommendations API |
+
+### J.11 Decision support
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Is this right for me? | "Will this work for me?" / "Is this overkill?" | F1 + F19 + F20 | Pack expert + reviews + profile |
+| Compare these | "Compare these two laptops" | F16 | Compare tool |
+| Cheaper alternative | "Anything cheaper that's similar?" | F1 + F36 | `search_catalog` with attribute filter at lower price band |
+| Premium upgrade | "What's the better version of this?" | F1 + F36 | Same product line, higher price tier |
+| Last year's model | "Anything from last year still available?" | F36 | Metafield `model_year` filter |
+| Should I wait for new model | "Is a new version coming?" | F37 | Model-lifecycle metafield / merchant config |
+| What do experts say | "Is this a respected brand?" | F1 + F9 | Pack persona + merchant brand KB |
+
+### J.12 Out-of-catalog & substitution
+
+| Query family | Example phrasings | Feature | Tool / data |
+|---|---|---|---|
+| Do you carry brand X? | "Do you have anything from {brand we don't carry}?" | F31 | `find_substitutes` tool |
+| Comparable product | "Something like the {product we don't have} but in your store?" | F31 | Substitute-by-attribute |
+| Log the unfulfilled request | (automated) | F31 | `UnfulfilledRequest` |
+
+### J.13 Edge cases & safety
+
+| Query family | Example phrasings | Feature | Response |
+|---|---|---|---|
+| Off-topic | "What's the capital of France?" | F1 base prompt | Polite redirect — never answer off-topic |
+| Medical advice (beauty) | "Will this cure my acne?" | F1 + Beauty pack safety | Refuse; recommend dermatologist |
+| Sympathy (flowers) | "Flowers for a funeral" | Flowers pack sympathy flow | Sensitive tone; no upsell |
+| Pet safety (flowers) | "Safe with cats?" | Flowers pack | Pet-toxicity KB; never guess |
+| Pregnancy (beauty) | "Pregnancy-safe?" | Beauty pack safety | List common avoids; recommend OB-GYN |
+| Authenticity / certification | "Is this real?" / "GIA certified?" | F1 safety | Only confirm if product metadata says so |
+| Hallucinated catalog | (assistant trying to claim a product we don't have) | F31 | Refuse — say what we don't carry |
+| Frustrated / abusive | (negative sentiment) | F12 handoff | De-escalate; offer human handoff |
+| Rate-limited (rapid identical messages) | (abuse) | F14 | Throttle gently |
+| Privacy request | "Delete my data" | F20 + GDPR | Erase profile + conversation history |
+
+---
+
+### J.14 Query-to-tool routing reference
+
+For Claude Code: when implementing F1's tool registry, ensure the LLM has access to (and only to) these tools, named consistently with their UCP names where applicable:
+
+```
+// Catalog (UCP)
+search_catalog          — F36, the new UCP catalog search (replaces search_shop_catalog)
+lookup_catalog          — F36, UCP lookup
+get_product             — F36, UCP single-product detail
+
+// Cart & policies (non-UCP, separate endpoint)
+get_cart                — existing
+update_cart             — existing
+search_shop_policies_and_faqs — existing
+
+// Customer (MCP customer endpoint)
+get_most_recent_order_status   — existing
+get_order_status               — existing
+
+// Pack-driven discovery flows (F2)
+start_gift_finder, start_engagement_ring_wizard, start_birthstone_match,
+start_fit_finder, start_outfit_builder, start_shoe_fit_advisor,
+start_replacement_finder, start_spec_wizard, start_compatibility_checker,
+start_upgrade_advisor, start_occasion_picker, start_bouquet_builder,
+start_sympathy_helper, start_skin_type_quiz, start_routine_builder,
+start_ingredient_conflict_checker, start_shade_match, start_room_fit_advisor,
+start_material_picker, start_lead_time_planner, start_style_consultation
+(generic) start_gift_finder, start_comparison, start_occasion_shopper
+
+// Sizing (F3)
+jewelry_sizing_advisor, fashion_fit_advisor, footwear_fit_advisor,
+home_dimension_check
+
+// Upsell / bundles (F5, F30)
+suggest_complementary_products, build_bundle, suggest_subscription
+
+// Visual search (F6)
+visual_search
+
+// Cart recovery (F7)
+save_cart_for_later, offer_consultation
+
+// Knowledge (F9)
+retrieve_kb_chunks  // RAG retrieval; not directly LLM-called, server-injects
+
+// Handoff (F12)
+request_human_handoff
+
+// Reviews (F19)
+query_product_reviews
+
+// Personalization (F20)
+get_shopper_profile_summary, recall_past_purchase, replenishment_check
+
+// Conversational checkout (F21)
+checkout_step
+
+// Post-purchase ops (F22)
+modify_order, initiate_return, initiate_exchange, check_refund_status, reorder_from_history
+
+// Logistics (F24)
+check_bopis_availability, schedule_delivery, calculate_duty, check_restricted_shipping
+
+// Loyalty (F25)
+get_loyalty_balance, redeem_points, get_gift_card_balance, apply_gift_card, get_referral_link
+
+// Continuity (F26)
+send_recap_email, set_notification_preference
+
+// Collaboration (F27)
+share_cart, start_joint_decision
+
+// Gift workflow (F28)
+add_gift_wrap, schedule_delivery_date, set_standing_gift
+
+// Pricing (F29, F37)
+get_price_history, subscribe_to_price_drop, evaluate_buy_timing
+
+// Out-of-catalog (F31)
+find_substitutes
+
+// Agentic (F32 — separate server endpoint, not LLM-called)
+(N/A — exposed to external clients)
+
+// Trends (F34)
+get_seasonal_collection, subscribe_to_drop
+
+// B2B (F35)
+request_quote, get_tiered_price
+
+// Shopify-native (F36)
+get_inventory, get_metafields, list_collections, get_discount_codes,
+get_market_info, create_draft_order, get_customer_tags, get_native_recommendations
+```
+
+The implementer should treat this list as the canonical tool registry. New verticals or features that need new tools must be added here so Claude Code keeps a single source of truth.
 
 ---
 
