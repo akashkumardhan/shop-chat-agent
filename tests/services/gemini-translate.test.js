@@ -182,6 +182,112 @@ describe('toGeminiTools', () => {
     expect(original).toEqual(snapshot); // unchanged
     expect(original.additionalProperties).toBe(false); // still there in source
   });
+
+  // Regression: Gemini rejects `required` on non-object schemas with
+  //   "required: only allowed for OBJECT type"
+  // and rejects names in `required` that aren't in `properties` with
+  //   "required[N]: property is not defined"
+  // The real-world failure was Shopify's update_cart tool where
+  //   { add_items: { type: 'array', required: ['items'], items: {...} } }
+  // — `items` is a JSON Schema keyword for array contents, not a property.
+  it('drops `required` from non-object schemas (Gemini error: only allowed for OBJECT type)', () => {
+    const result = toGeminiTools([
+      {
+        name: 'update_cart',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          properties: {
+            add_items: {
+              type: 'array',
+              required: ['items'],   // <- ill-formed; Gemini rejects
+              items: { type: 'object', properties: { variant_id: { type: 'string' } } },
+            },
+          },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.properties.add_items.required).toBeUndefined();
+    // But the array's `items` schema is preserved
+    expect(params.properties.add_items.items.type).toBe('object');
+  });
+
+  it('prunes from `required` any names not in `properties` (Gemini error: property is not defined)', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          required: ['a', 'b', 'ghost'],
+          properties: {
+            a: { type: 'string' },
+            b: { type: 'number' },
+            // ghost is NOT defined here — must be pruned from required
+          },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.required).toEqual(['a', 'b']);
+  });
+
+  it('drops `required` entirely if pruning empties it', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          required: ['ghost'],
+          properties: { a: { type: 'string' } },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.required).toBeUndefined();
+    expect(params.properties.a).toEqual({ type: 'string' });
+  });
+
+  it('keeps `required` intact on a well-formed object schema', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          required: ['a'],
+          properties: { a: { type: 'string' }, b: { type: 'number' } },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.required).toEqual(['a']);
+  });
+
+  it('handles nested objects with their own required arrays correctly', () => {
+    const result = toGeminiTools([
+      {
+        name: 'foo',
+        description: 'x',
+        input_schema: {
+          type: 'object',
+          required: ['inner'],
+          properties: {
+            inner: {
+              type: 'object',
+              required: ['x', 'phantom'],   // phantom should be pruned
+              properties: { x: { type: 'string' } },
+            },
+          },
+        },
+      },
+    ]);
+    const params = result[0].functionDeclarations[0].parameters;
+    expect(params.required).toEqual(['inner']);
+    expect(params.properties.inner.required).toEqual(['x']);
+  });
 });
 
 describe('toGeminiContents', () => {

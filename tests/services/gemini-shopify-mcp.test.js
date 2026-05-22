@@ -90,6 +90,53 @@ describe('sanitizeSchemaForGemini — live Shopify MCP fixture', () => {
     expect(after).toEqual(before);
   });
 
+  /**
+   * Find every `required` that violates Gemini's rules:
+   *   - required on a non-object schema, OR
+   *   - required[N] not present in properties
+   */
+  function findInvalidRequired(node, path = '', hits = []) {
+    if (node === null || typeof node !== 'object') return hits;
+    if (Array.isArray(node)) {
+      node.forEach((v, i) => findInvalidRequired(v, `${path}[${i}]`, hits));
+      return hits;
+    }
+    if (Array.isArray(node.required)) {
+      if (node.type !== 'object') {
+        hits.push(`${path}.required (on type=${node.type})`);
+      } else {
+        const props = Object.keys(node.properties || {});
+        const missing = node.required.filter((n) => !props.includes(n));
+        if (missing.length > 0) {
+          hits.push(`${path}.required missing in properties: ${missing.join(',')}`);
+        }
+      }
+    }
+    for (const [k, v] of Object.entries(node)) {
+      const next = path ? `${path}.${k}` : k;
+      findInvalidRequired(v, next, hits);
+    }
+    return hits;
+  }
+
+  it('the fixture itself contains malformed `required` arrays (sanity check)', () => {
+    let totalHits = 0;
+    for (const t of tools) {
+      const schema = t.inputSchema || t.input_schema || {};
+      totalHits += findInvalidRequired(schema).length;
+    }
+    // We confirmed update_cart has 3 malformed required arrays (add_items,
+    // update_items, remove_line_ids — each type=array with required=['items']).
+    expect(totalHits).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(tools)('sanitizes "$name" with zero malformed `required` arrays remaining', (tool) => {
+    const schema = tool.inputSchema || tool.input_schema || {};
+    const sanitised = sanitizeSchemaForGemini(schema);
+    const hits = findInvalidRequired(sanitised);
+    expect(hits, `malformed required still present in ${tool.name}: ${hits.join(' | ')}`).toEqual([]);
+  });
+
   it('preserves at least some valid keywords (regression — over-strip would be just as bad)', () => {
     // search_catalog has a known `query` parameter with type=string.
     const searchCatalog = tools.find((t) => t.name === 'search_catalog');

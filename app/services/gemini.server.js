@@ -63,7 +63,17 @@ const GEMINI_INCOMPATIBLE_KEYWORDS = new Set([
 ]);
 
 /**
- * Recursively clone a JSON Schema, dropping keywords Gemini doesn't accept.
+ * Recursively clone a JSON Schema, dropping keywords Gemini doesn't accept,
+ * and fixing up `required` arrays that violate Gemini's stricter rules.
+ *
+ * Three transformations:
+ *   1. Drop blanket-incompatible keywords (GEMINI_INCOMPATIBLE_KEYWORDS)
+ *   2. Drop `required` from any schema where `type !== 'object'`
+ *      (Gemini: "required: only allowed for OBJECT type")
+ *   3. For object schemas, prune any name in `required` that isn't in
+ *      `properties` (Gemini: "required[N]: property is not defined")
+ *      If pruning empties the list, drop `required` entirely.
+ *
  * Never mutates the input; safe to call on the live tool registry's schemas.
  *
  * @param {*} schema
@@ -76,9 +86,39 @@ export function sanitizeSchemaForGemini(schema) {
   const out = {};
   for (const [k, v] of Object.entries(schema)) {
     if (GEMINI_INCOMPATIBLE_KEYWORDS.has(k)) continue;
+    if (k === 'required') {
+      // Defer — handle below after we've seen `type` and `properties`.
+      continue;
+    }
     out[k] = sanitizeSchemaForGemini(v);
   }
+
+  const pruned = pruneRequiredForGemini(schema);
+  if (pruned !== undefined) {
+    out.required = pruned;
+  }
+
   return out;
+}
+
+/**
+ * Decide what to emit for `required` based on the source schema's type
+ * and properties. Returns the filtered array, or undefined to omit the
+ * field entirely.
+ *
+ * Gemini's rules:
+ *   - `required` is only valid on object schemas
+ *   - Every name in `required` must also be a key in `properties`
+ *
+ * @param {Object} schema  The *source* schema (not the sanitized output)
+ * @returns {Array<string>|undefined}
+ */
+function pruneRequiredForGemini(schema) {
+  if (!Array.isArray(schema.required)) return undefined;
+  if (schema.type !== 'object') return undefined;
+  const propertyNames = Object.keys(schema.properties || {});
+  const filtered = schema.required.filter((name) => propertyNames.includes(name));
+  return filtered.length > 0 ? filtered : undefined;
 }
 
 /**
