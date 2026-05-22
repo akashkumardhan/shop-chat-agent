@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { toGeminiTools, toGeminiContents } from '../../app/services/gemini.server.js';
+import { toGeminiTools, toGeminiContents, consumeGeminiStream } from '../../app/services/gemini.server.js';
 
 describe('toGeminiTools', () => {
   it('returns null when given empty tools (Gemini accepts no `tools` key, not [])', () => {
@@ -179,5 +179,111 @@ describe('toGeminiContents', () => {
     expect(result[2].role).toBe('user');
     expect(result[2].parts[0].functionResponse.name).toBe('list_my_orders');
     expect(result[3].role).toBe('model');
+  });
+});
+
+describe('consumeGeminiStream', () => {
+  /**
+   * Helper: build a fake Gemini stream that yields the given chunks.
+   * Each chunk shape: { textValue: string|null, functionCalls: Array }
+   */
+  function fakeStream(chunks) {
+    return {
+      stream: (async function* () {
+        for (const c of chunks) {
+          yield {
+            text: () => c.textValue || '',
+            functionCalls: () => c.functionCalls || [],
+          };
+        }
+      })(),
+    };
+  }
+
+  it('accumulates text chunks and emits onText per chunk', async () => {
+    const onText = vi.fn();
+    const onMessage = vi.fn();
+    const onContentBlock = vi.fn();
+
+    const stream = fakeStream([
+      { textValue: 'Hello, ' },
+      { textValue: 'world!' },
+    ]);
+
+    const final = await consumeGeminiStream(stream, { onText, onMessage, onContentBlock });
+
+    expect(onText).toHaveBeenNthCalledWith(1, 'Hello, ');
+    expect(onText).toHaveBeenNthCalledWith(2, 'world!');
+    expect(final.role).toBe('assistant');
+    expect(final.content).toEqual([{ type: 'text', text: 'Hello, world!' }]);
+    expect(final.stop_reason).toBe('end_turn');
+    expect(onMessage).toHaveBeenCalledWith({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'Hello, world!' }],
+    });
+    expect(onContentBlock).toHaveBeenCalledWith({ type: 'text', text: 'Hello, world!' });
+  });
+
+  it('emits onToolUse and sets stop_reason="tool_use" when functionCalls arrive', async () => {
+    const onText = vi.fn();
+    const onToolUse = vi.fn();
+    const onMessage = vi.fn();
+
+    const stream = fakeStream([
+      { textValue: "I'll check that." },
+      { functionCalls: [{ name: 'list_my_orders', args: { next: true } }] },
+    ]);
+
+    const final = await consumeGeminiStream(stream, { onText, onToolUse, onMessage });
+
+    expect(onText).toHaveBeenCalledWith("I'll check that.");
+    expect(onToolUse).toHaveBeenCalledTimes(1);
+    const toolBlock = onToolUse.mock.calls[0][0];
+    expect(toolBlock.type).toBe('tool_use');
+    expect(toolBlock.name).toBe('list_my_orders');
+    expect(toolBlock.input).toEqual({ next: true });
+    expect(toolBlock.id).toMatch(/^g_/); // synthesised id prefix
+
+    expect(final.stop_reason).toBe('tool_use');
+    expect(final.content).toEqual([
+      { type: 'text', text: "I'll check that." },
+      toolBlock,
+    ]);
+  });
+
+  it('handles a stream with no text and just a function call', async () => {
+    const onToolUse = vi.fn();
+    const stream = fakeStream([
+      { functionCalls: [{ name: 'get_my_profile', args: {} }] },
+    ]);
+
+    const final = await consumeGeminiStream(stream, { onToolUse });
+    expect(final.stop_reason).toBe('tool_use');
+    expect(final.content).toEqual([
+      expect.objectContaining({ type: 'tool_use', name: 'get_my_profile' }),
+    ]);
+  });
+
+  it('handles multiple function calls in a single chunk', async () => {
+    const onToolUse = vi.fn();
+    const stream = fakeStream([
+      {
+        functionCalls: [
+          { name: 'list_my_orders', args: {} },
+          { name: 'get_my_profile', args: {} },
+        ],
+      },
+    ]);
+
+    await consumeGeminiStream(stream, { onToolUse });
+    expect(onToolUse).toHaveBeenCalledTimes(2);
+  });
+
+  it('survives a stream that emits no events at all (defensive)', async () => {
+    const stream = fakeStream([]);
+    const final = await consumeGeminiStream(stream, {});
+    expect(final.role).toBe('assistant');
+    expect(final.content).toEqual([]);
+    expect(final.stop_reason).toBe('end_turn');
   });
 });

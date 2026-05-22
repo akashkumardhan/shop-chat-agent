@@ -100,6 +100,71 @@ export function toGeminiContents(messages) {
   return out;
 }
 
+/**
+ * Consume a Gemini streaming response and emit Claude-shaped events through
+ * the provided callbacks. Returns a `finalMessage` shaped like Claude's
+ * (`role`, `content[]`, `stop_reason`) so the chat.jsx while-loop continues
+ * to work unmodified.
+ *
+ * @param {{ stream: AsyncIterable<any> }} geminiStream  The object returned by
+ *   model.generateContentStream(...). Its `.stream` property is an async
+ *   iterator of chunks. Each chunk has `.text()` and `.functionCalls()` getters.
+ * @param {Object} callbacks
+ * @param {Function} [callbacks.onText]         Called per text delta.
+ * @param {Function} [callbacks.onMessage]      Called once with the assembled assistant message.
+ * @param {Function} [callbacks.onToolUse]      Called once per synthesised tool_use block.
+ * @param {Function} [callbacks.onContentBlock] Called once per content block at end of stream.
+ * @returns {Promise<{ role: 'assistant', content: Array, stop_reason: 'end_turn'|'tool_use' }>}
+ */
+export async function consumeGeminiStream(geminiStream, callbacks = {}) {
+  const { onText, onMessage, onToolUse, onContentBlock } = callbacks;
+  let textBuffer = '';
+  const toolCalls = [];
+
+  for await (const chunk of geminiStream.stream) {
+    const text = typeof chunk.text === 'function' ? chunk.text() : '';
+    if (text) {
+      textBuffer += text;
+      onText?.(text);
+    }
+    const fns = typeof chunk.functionCalls === 'function' ? chunk.functionCalls() : [];
+    for (const fn of fns || []) {
+      toolCalls.push(fn);
+    }
+  }
+
+  const content = [];
+  if (textBuffer) {
+    const block = { type: 'text', text: textBuffer };
+    content.push(block);
+    onContentBlock?.(block);
+  }
+  for (const fn of toolCalls) {
+    const block = {
+      type: 'tool_use',
+      id: `g_${cryptoRandomUUID()}`,
+      name: fn.name,
+      input: fn.args || {},
+    };
+    content.push(block);
+    await onToolUse?.(block);
+  }
+
+  const finalMessage = { role: 'assistant', content };
+  onMessage?.(finalMessage);
+
+  return {
+    ...finalMessage,
+    stop_reason: toolCalls.length > 0 ? 'tool_use' : 'end_turn',
+  };
+}
+
+// Local UUID helper. Wraps the global so we can stub it in tests if needed.
+function cryptoRandomUUID() {
+  // Node 20+: crypto.randomUUID exists on the global crypto object.
+  return globalThis.crypto.randomUUID();
+}
+
 export function createGeminiService() {
   throw new Error("createGeminiService not yet implemented");
 }
