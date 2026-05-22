@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
-import { toGeminiTools, toGeminiContents, consumeGeminiStream } from '../../app/services/gemini.server.js';
+import {
+  toGeminiTools,
+  toGeminiContents,
+  consumeGeminiStream,
+  createGeminiService,
+} from '../../app/services/gemini.server.js';
 
 describe('toGeminiTools', () => {
   it('returns null when given empty tools (Gemini accepts no `tools` key, not [])', () => {
@@ -285,5 +290,26 @@ describe('consumeGeminiStream', () => {
     expect(final.role).toBe('assistant');
     expect(final.content).toEqual([]);
     expect(final.stop_reason).toBe('end_turn');
+  });
+});
+
+describe('createGeminiService', () => {
+  it('throws a helpful error if no API key is provided', () => {
+    expect(() => createGeminiService('')).toThrow(/GEMINI_API_KEY/);
+    expect(() => createGeminiService(undefined)).toThrow(/GEMINI_API_KEY/);
+  });
+
+  it('returns an object exposing streamConversation + getSystemPrompt when key is provided', () => {
+    // Use a fake key — we won't make any real API calls in this test.
+    const svc = createGeminiService('fake-key-for-unit-test');
+    expect(typeof svc.streamConversation).toBe('function');
+    expect(typeof svc.getSystemPrompt).toBe('function');
+  });
+
+  it('getSystemPrompt returns the standard prompt content', () => {
+    const svc = createGeminiService('fake-key-for-unit-test');
+    const p = svc.getSystemPrompt('standardAssistant');
+    expect(typeof p).toBe('string');
+    expect(p.length).toBeGreaterThan(50);
   });
 });

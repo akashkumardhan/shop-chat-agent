@@ -165,6 +165,57 @@ function cryptoRandomUUID() {
   return globalThis.crypto.randomUUID();
 }
 
-export function createGeminiService() {
-  throw new Error("createGeminiService not yet implemented");
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import AppConfig from "./config.server";
+import systemPrompts from "../prompts/prompts.json";
+
+/**
+ * Create a Gemini service exposing the same interface as createClaudeService:
+ *   - streamConversation({ messages, promptType, tools }, callbacks) => finalMessage
+ *   - getSystemPrompt(promptType) => string
+ *
+ * The signature matches Claude's so app/services/llm.server.js can swap the
+ * two transparently and chat.jsx + tool.server.js don't change.
+ */
+export function createGeminiService(apiKey = process.env.GEMINI_API_KEY) {
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not set. Either set it in .env or set LLM_PROVIDER=claude."
+    );
+  }
+
+  const client = new GoogleGenerativeAI(apiKey);
+
+  const getSystemPrompt = (promptType) =>
+    systemPrompts.systemPrompts[promptType]?.content ||
+    systemPrompts.systemPrompts[AppConfig.api.defaultPromptType].content;
+
+  const streamConversation = async (
+    { messages, promptType = AppConfig.api.defaultPromptType, tools },
+    callbacks = {}
+  ) => {
+    const systemInstruction = getSystemPrompt(promptType);
+    const model = client.getGenerativeModel({
+      model: AppConfig.api.geminiModel,
+      systemInstruction,
+    });
+
+    const contents = toGeminiContents(messages);
+    const geminiTools = toGeminiTools(tools);
+
+    const request = {
+      contents,
+      generationConfig: { maxOutputTokens: AppConfig.api.maxTokens },
+    };
+    if (geminiTools) {
+      request.tools = geminiTools;
+    }
+
+    const stream = await model.generateContentStream(request);
+    return consumeGeminiStream(stream, callbacks);
+  };
+
+  return { streamConversation, getSystemPrompt };
 }
+
+export default { createGeminiService };

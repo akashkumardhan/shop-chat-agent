@@ -7,6 +7,7 @@ export const AppConfig = {
   // API Configuration
   api: {
     defaultModel: 'claude-sonnet-4-20250514',
+    geminiModel: 'gemini-2.5-flash',
     maxTokens: 2000,
     defaultPromptType: 'standardAssistant',
   },
