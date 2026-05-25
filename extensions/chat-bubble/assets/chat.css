@@ -1367,10 +1367,82 @@
   padding: 2px var(--swa-space-2);
   border-radius: var(--swa-radius-full);
 }
-.swa-order-status-pill[data-status="processing"] { background: var(--swa-color-warning-bg); color: var(--swa-color-warning-fg); }
-.swa-order-status-pill[data-status="shipped"]    { background: var(--swa-color-info-bg);    color: var(--swa-color-info-fg); }
-.swa-order-status-pill[data-status="delivered"]  { background: var(--swa-color-success-bg); color: var(--swa-color-success-fg); }
-.swa-order-status-pill[data-status="cancelled"]  { background: var(--swa-color-bg-subtle);  color: var(--swa-color-text-tertiary); }
+.swa-order-status-pill[data-status="processing"]   { background: var(--swa-color-warning-bg); color: var(--swa-color-warning-fg); }
+.swa-order-status-pill[data-status="shipped"]      { background: var(--swa-color-info-bg);    color: var(--swa-color-info-fg); }
+.swa-order-status-pill[data-status="delivered"]    { background: var(--swa-color-success-bg); color: var(--swa-color-success-fg); }
+.swa-order-status-pill[data-status="cancelled"]    { background: var(--swa-color-bg-subtle);  color: var(--swa-color-text-tertiary); }
+.swa-order-status-pill[data-status="unfulfilled"]  { background: var(--swa-color-bg-subtle);  color: var(--swa-color-text-tertiary); }
+
+/* Header badges row holds the status pill + optional finance badge */
+.swa-order-badges {
+  display: flex;
+  align-items: center;
+  gap: var(--swa-space-1);
+  flex-wrap: wrap;
+}
+.swa-order-finance-pill {
+  font-size: var(--swa-text-xs);
+  font-weight: var(--swa-weight-medium);
+  padding: 2px var(--swa-space-2);
+  border-radius: var(--swa-radius-full);
+}
+.swa-order-finance-pill[data-tone="critical"] { background: var(--swa-color-danger-bg);  color: var(--swa-color-danger-fg); }
+.swa-order-finance-pill[data-tone="warning"]  { background: var(--swa-color-warning-bg); color: var(--swa-color-warning-fg); }
+.swa-order-finance-pill[data-tone="info"]     { background: var(--swa-color-info-bg);    color: var(--swa-color-info-fg); }
+
+.swa-order-cancel-banner {
+  background: var(--swa-color-bg-subtle);
+  color: var(--swa-color-text-secondary);
+  padding: var(--swa-space-2);
+  border-radius: var(--swa-radius-sm);
+  font-size: var(--swa-text-xs);
+  margin-bottom: var(--swa-space-2);
+}
+
+/* Per-parcel tracking section */
+.swa-order-fulfillments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--swa-space-2);
+  margin: var(--swa-space-2) 0;
+}
+.swa-order-parcel {
+  background: var(--swa-color-bg-subtle);
+  border-radius: var(--swa-radius-sm);
+  padding: var(--swa-space-2);
+  font-size: var(--swa-text-xs);
+}
+.swa-order-parcel-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--swa-space-1);
+  margin-bottom: var(--swa-space-1);
+}
+.swa-order-parcel-label {
+  font-weight: var(--swa-weight-medium);
+  color: var(--swa-color-text-secondary);
+}
+.swa-order-parcel-carrier {
+  color: var(--swa-color-text-tertiary);
+}
+.swa-order-parcel-items {
+  color: var(--swa-color-text-tertiary);
+  margin-bottom: var(--swa-space-1);
+}
+.swa-order-parcel-tracking {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--swa-space-2);
+}
+.swa-order-track-link {
+  color: var(--swa-color-info-fg);
+  text-decoration: none;
+  font-weight: var(--swa-weight-medium);
+}
+.swa-order-track-number {
+  color: var(--swa-color-text-secondary);
+  font-family: var(--swa-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
 
 .swa-order-items {
   border-top: 1px solid var(--swa-color-border);
