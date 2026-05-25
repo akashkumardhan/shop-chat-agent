@@ -32,6 +32,7 @@ const PACK_TABLES = {
         button_text: 'Talk it through →',
       },
       chips: [
+        { intent: 'recent_orders', label: 'My recent orders', isPrimary: false },
         { intent: 'returns_policy', label: 'Returns policy', isPrimary: false },
         { intent: 'save_for_later', label: 'Save for later', isPrimary: false },
       ],
@@ -48,6 +49,7 @@ const PACK_TABLES = {
 };
 
 const DEFAULT_CHIPS = [
+  { intent: 'recent_orders', label: 'My recent orders', isPrimary: false },
   { intent: 'gift_mode', label: "It's a gift", isPrimary: false },
   { intent: 'bestsellers', label: 'Show bestsellers', isPrimary: false },
   { intent: 'returns_policy', label: 'Returns policy', isPrimary: false },
