@@ -2,16 +2,12 @@ import { useState } from 'react';
 import { FULL_DUMMY_CLAUDE, FULL_DUMMY_GEMINI } from '../../data/mock-dashboard.server';
 
 /**
- * Mock settings form: provider toggle + two read-only masked API key
- * fields. No persistence — Save shows a toast, Cancel resets local
- * state. Refresh resets everything (matches the loader's env-derived
- * defaults).
- *
- * Implementation note: Polaris web component element names below
- * (s-choice-list, s-choice, s-text-field, s-button, s-link) follow
- * Shopify's documented naming convention. If a name turns out to
- * differ in the live catalog, substitute the correct element while
- * keeping the visual outcome.
+ * Mock settings form using the canonical Shopify settings template:
+ * each section is a two-column layout — left column has the heading and
+ * description, right column has the form controls. Save/Cancel use
+ * <s-button-group>. <s-text-field readOnly> is used for the API keys
+ * since Reveal is a toggle (full dummy ↔ masked) rather than a true
+ * password entry.
  */
 export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
   const [provider, setProvider] = useState(activeProvider);
@@ -33,77 +29,119 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
     setGeminiRevealed(false);
   }
 
-  function providerLabel(key, label) {
-    return provider === key ? `${label} (active)` : label;
-  }
-
   return (
     <>
-      <s-section heading="Active provider">
-        <s-text variant="bodySm" color="subdued">
-          Choose which LLM powers the chat agent.
-        </s-text>
-        <s-choice-list
-          name="provider"
-          value={provider}
-          onChange={(e) => setProvider(e.target.value)}
+      {/* Active provider */}
+      <s-section>
+        <s-grid
+          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
+          gap="base"
         >
-          <s-choice value="claude">{providerLabel('claude', 'Anthropic Claude')}</s-choice>
-          <s-choice value="gemini">{providerLabel('gemini', 'Google Gemini')}</s-choice>
-        </s-choice-list>
-      </s-section>
-
-      <s-section heading="Anthropic Claude API key">
-        <s-stack gap="tight">
-          <s-stack direction="inline" gap="tight" alignment="center">
-            <s-text-field
-              label="Anthropic Claude API key"
-              labelHidden
-              readOnly
-              type={claudeRevealed ? 'text' : 'password'}
-              value={claudeRevealed ? FULL_DUMMY_CLAUDE : claudeApiKey.masked}
-            />
-            <s-button onClick={() => setClaudeRevealed((v) => !v)}>
-              {claudeRevealed ? 'Hide' : 'Reveal'}
-            </s-button>
+          <s-stack gap="small-200">
+            <s-heading>Active provider</s-heading>
+            <s-text color="subdued">
+              Choose which LLM powers the chat agent. Changing the active
+              provider here is a mock — production wiring still uses the
+              LLM_PROVIDER environment variable.
+            </s-text>
           </s-stack>
-          <s-text variant="bodySm" color="subdued">
-            Get your key at{' '}
-            <s-link href="https://console.anthropic.com/" target="_blank">
-              console.anthropic.com
-            </s-link>
-          </s-text>
-        </s-stack>
+          <s-choice-list
+            label="Active provider"
+            labelAccessibilityVisibility="exclusive"
+            name="provider"
+            onChange={(e) => {
+              const next = e.currentTarget?.values?.[0];
+              if (next) setProvider(next);
+            }}
+          >
+            <s-choice value="claude" selected={provider === 'claude'}>
+              {provider === 'claude' ? 'Anthropic Claude (active)' : 'Anthropic Claude'}
+            </s-choice>
+            <s-choice value="gemini" selected={provider === 'gemini'}>
+              {provider === 'gemini' ? 'Google Gemini (active)' : 'Google Gemini'}
+            </s-choice>
+          </s-choice-list>
+        </s-grid>
       </s-section>
 
-      <s-section heading="Google Gemini API key">
-        <s-stack gap="tight">
-          <s-stack direction="inline" gap="tight" alignment="center">
-            <s-text-field
-              label="Google Gemini API key"
-              labelHidden
-              readOnly
-              type={geminiRevealed ? 'text' : 'password'}
-              value={geminiRevealed ? FULL_DUMMY_GEMINI : geminiApiKey.masked}
-            />
-            <s-button onClick={() => setGeminiRevealed((v) => !v)}>
-              {geminiRevealed ? 'Hide' : 'Reveal'}
-            </s-button>
+      {/* Anthropic Claude API key */}
+      <s-section>
+        <s-grid
+          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
+          gap="base"
+        >
+          <s-stack gap="small-200">
+            <s-heading>Anthropic Claude API key</s-heading>
+            <s-text color="subdued">
+              Get your key at{' '}
+              <s-link href="https://console.anthropic.com/" target="_blank">
+                console.anthropic.com
+              </s-link>
+              .
+            </s-text>
           </s-stack>
-          <s-text variant="bodySm" color="subdued">
-            Get your key at{' '}
-            <s-link href="https://aistudio.google.com/apikey" target="_blank">
-              aistudio.google.com/apikey
-            </s-link>
-          </s-text>
-        </s-stack>
+          <s-stack gap="small">
+            <s-stack direction="inline" gap="small" alignItems="end">
+              <s-text-field
+                label="Anthropic Claude API key"
+                labelAccessibilityVisibility="exclusive"
+                readOnly
+                value={claudeRevealed ? FULL_DUMMY_CLAUDE : claudeApiKey.masked}
+              />
+              <s-button
+                onClick={() => setClaudeRevealed((v) => !v)}
+                icon={claudeRevealed ? 'hide' : 'view'}
+              >
+                {claudeRevealed ? 'Hide' : 'Reveal'}
+              </s-button>
+            </s-stack>
+          </s-stack>
+        </s-grid>
       </s-section>
 
-      <s-stack direction="inline" gap="tight" distribution="trailing">
-        <s-button onClick={handleCancel}>Cancel</s-button>
-        <s-button variant="primary" onClick={handleSave}>
-          Save settings
-        </s-button>
+      {/* Google Gemini API key */}
+      <s-section>
+        <s-grid
+          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
+          gap="base"
+        >
+          <s-stack gap="small-200">
+            <s-heading>Google Gemini API key</s-heading>
+            <s-text color="subdued">
+              Get your key at{' '}
+              <s-link href="https://aistudio.google.com/apikey" target="_blank">
+                aistudio.google.com/apikey
+              </s-link>
+              .
+            </s-text>
+          </s-stack>
+          <s-stack gap="small">
+            <s-stack direction="inline" gap="small" alignItems="end">
+              <s-text-field
+                label="Google Gemini API key"
+                labelAccessibilityVisibility="exclusive"
+                readOnly
+                value={geminiRevealed ? FULL_DUMMY_GEMINI : geminiApiKey.masked}
+              />
+              <s-button
+                onClick={() => setGeminiRevealed((v) => !v)}
+                icon={geminiRevealed ? 'hide' : 'view'}
+              >
+                {geminiRevealed ? 'Hide' : 'Reveal'}
+              </s-button>
+            </s-stack>
+          </s-stack>
+        </s-grid>
+      </s-section>
+
+      {/* Action row */}
+      <s-stack direction="inline" justifyContent="end" gap="small">
+        <s-button-group>
+          <s-button onClick={handleCancel}>Cancel</s-button>
+          <s-button variant="primary" onClick={handleSave} icon="save">
+            Save settings
+          </s-button>
+        </s-button-group>
       </s-stack>
     </>
   );

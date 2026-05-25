@@ -11,8 +11,7 @@ export const loader = async ({ request }) => {
 export default function Settings() {
   const data = useLoaderData();
   return (
-    <s-page>
-      <ui-title-bar title="Settings" />
+    <s-page heading="Settings">
       <SettingsForm {...data} />
     </s-page>
   );

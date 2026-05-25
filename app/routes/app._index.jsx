@@ -15,15 +15,20 @@ export default function Index() {
   const { stats, series, trendingSearched, recentPurchased } = useLoaderData();
 
   return (
-    <s-page>
-      <ui-title-bar title="Shop chat agent reference app" />
+    <s-page heading="Shop chat agent">
+      {/* Metrics row — canonical metrics-card composition */}
+      <StatCardRow stats={stats} />
 
+      {/* Performance trend */}
       <s-section heading="Performance — last 14 days">
-        <StatCardRow stats={stats} />
         <LineGraph series={series} />
       </s-section>
 
-      <s-stack direction="inline" distribution="fill" gap="base" wrap>
+      {/* Two-column product activity */}
+      <s-grid
+        gridTemplateColumns="@container (inline-size <= 700px) 1fr, 1fr 1fr"
+        gap="base"
+      >
         <ProductList
           title="Trending searched products"
           items={trendingSearched}
@@ -36,7 +41,7 @@ export default function Index() {
             `${formatCurrency({ amount: item.price, currencyCode: item.currencyCode })} · ${item.purchasedAt}`
           }
         />
-      </s-stack>
+      </s-grid>
     </s-page>
   );
 }

@@ -4,7 +4,7 @@
   "scripts": {
     "build": "react-router build",
     "build:extension": "node scripts/build-extension.js",
-    "dev": "shopify app dev",
+    "dev": "shopify app dev --use-localhost",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
     "deploy": "npm run build:extension && shopify app deploy",
@@ -64,6 +64,7 @@
     "eslint-plugin-react": "^7.33.2",
     "eslint-plugin-react-hooks": "^4.6.0",
     "happy-dom": "^15.11.7",
+    "preact": "^10.29.2",
     "prettier": "^3.2.4",
     "typescript": "^5.2.2",
     "vite": "^6.2.2",

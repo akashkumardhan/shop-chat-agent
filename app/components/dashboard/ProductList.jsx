@@ -1,29 +1,47 @@
 /**
- * Compact, text-only ranked product list. Used twice on the dashboard:
- * once for "Trending searched products" and once for "Recent purchased
- * products". The metric prop is a function so each instance picks its
- * own right-aligned text.
+ * Compact ranked product list. Rows use <s-clickable> for hover affordance
+ * and a chevron, with thin top borders providing row separation. Empty
+ * state is a subdued message.
+ *
+ * Used twice on the dashboard:
+ *   • Trending searched products (metric: "N searches")
+ *   • Recent purchased products (metric: "$P · time-ago")
  */
 export function ProductList({ title, items, metric }) {
   return (
-    <s-section heading={title}>
+    <s-section heading={title} padding="none">
       {!items || items.length === 0 ? (
-        <s-text color="subdued">No data yet</s-text>
+        <s-stack padding="base">
+          <s-text color="subdued">No data yet</s-text>
+        </s-stack>
       ) : (
-        <s-stack gap="tight">
-          {items.map((item) => (
-            <s-stack
+        <s-stack>
+          {items.map((item, idx) => (
+            <s-clickable
               key={`${title}-${item.rank}`}
-              direction="inline"
-              distribution="equalSpacing"
-              alignment="center"
+              borderStyle={idx === 0 ? 'none' : 'solid none none none'}
+              border="base"
+              paddingInline="base"
+              paddingBlock="small"
             >
-              <s-stack direction="inline" gap="tight">
-                <s-text color="subdued">{item.rank}</s-text>
+              <s-grid
+                gridTemplateColumns="auto 1fr auto auto"
+                gap="small"
+                alignItems="center"
+              >
+                <s-text color="subdued" fontVariantNumeric="tabular-nums">
+                  {item.rank}
+                </s-text>
                 <s-text>{item.name}</s-text>
-              </s-stack>
-              <s-text variant="bodySm" color="subdued">{metric(item)}</s-text>
-            </s-stack>
+                <s-text
+                  color="subdued"
+                  fontVariantNumeric="tabular-nums"
+                >
+                  {metric(item)}
+                </s-text>
+                <s-icon type="chevron-right" color="subdued" />
+              </s-grid>
+            </s-clickable>
           ))}
         </s-stack>
       )}
