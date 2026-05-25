@@ -1,17 +1,22 @@
 import { useState } from 'react';
 
 /**
- * Mock settings form using the canonical Shopify settings template:
- * each section is a two-column layout — left column has the heading and
- * description, right column has the form controls. Save/Cancel use
- * <s-button-group>. <s-text-field readOnly> is used for the API keys
- * since Reveal is a toggle (full dummy ↔ masked) rather than a true
- * password entry.
+ * Settings form (mock UI for demo purposes).
  *
- * The full dummy key strings are passed in via the `claudeApiKey.full`
- * and `geminiApiKey.full` fields of the loader data — we do not import
- * them from the *.server.js file because that would violate React
- * Router's server-only-module boundary and break client-side rendering.
+ * Layout follows the canonical Shopify settings template:
+ *  - Top banner explains the demo nature of the page.
+ *  - Provider selection uses two clickable provider cards (more visual
+ *    than a radio list — each card shows an avatar, name, description,
+ *    and an "Active" badge on the selected option).
+ *  - Each API key section is a two-column grid: left column has the
+ *    heading + "Configured" status badge + helper link; right column
+ *    has the read-only masked field + Reveal/Hide button + last-4 hint.
+ *  - Save/Cancel use <s-button-group> aligned to the trailing edge.
+ *  - Bottom footer-help section points to documentation.
+ *
+ * Full dummy keys are passed in via loader data
+ * (claudeApiKey.full, geminiApiKey.full) — we do NOT import them
+ * from the server-only mock-dashboard.server.js module.
  */
 export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
   const [provider, setProvider] = useState(activeProvider);
@@ -35,108 +40,70 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
 
   return (
     <>
-      {/* Active provider */}
-      <s-section>
-        <s-grid
-          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
-          gap="base"
-        >
-          <s-stack gap="small-200">
-            <s-heading>Active provider</s-heading>
-            <s-text color="subdued">
-              Choose which LLM powers the chat agent. Changing the active
-              provider here is a mock — production wiring still uses the
-              LLM_PROVIDER environment variable.
-            </s-text>
-          </s-stack>
-          <s-choice-list
-            label="Active provider"
-            labelAccessibilityVisibility="exclusive"
-            name="provider"
-            onChange={(e) => {
-              const next = e.currentTarget?.values?.[0];
-              if (next) setProvider(next);
-            }}
+      {/* Demo-mode banner */}
+      <s-banner heading="Demo settings" tone="info">
+        These settings are a UI demonstration. The chat agent's real provider
+        selection and API authentication continue to use the{' '}
+        <s-text type="strong">LLM_PROVIDER</s-text>,{' '}
+        <s-text type="strong">CLAUDE_API_KEY</s-text>, and{' '}
+        <s-text type="strong">GEMINI_API_KEY</s-text> environment variables
+        on the server.
+      </s-banner>
+
+      {/* Provider selection */}
+      <s-section heading="LLM provider">
+        <s-stack gap="base">
+          <s-text color="subdued">
+            Choose which large language model powers the chat agent. The
+            active provider is highlighted below.
+          </s-text>
+          <s-grid
+            gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 1fr"
+            gap="base"
           >
-            <s-choice value="claude" selected={provider === 'claude'}>
-              {provider === 'claude' ? 'Anthropic Claude (active)' : 'Anthropic Claude'}
-            </s-choice>
-            <s-choice value="gemini" selected={provider === 'gemini'}>
-              {provider === 'gemini' ? 'Google Gemini (active)' : 'Google Gemini'}
-            </s-choice>
-          </s-choice-list>
-        </s-grid>
+            <ProviderCard
+              initials="C"
+              name="Anthropic Claude"
+              model="claude-sonnet-4"
+              description="Strong reasoning, long-form responses, and rich tool use."
+              active={provider === 'claude'}
+              onSelect={() => setProvider('claude')}
+            />
+            <ProviderCard
+              initials="G"
+              name="Google Gemini"
+              model="gemini-2.5-flash"
+              description="Fast, generous free tier — ideal for development and demos."
+              active={provider === 'gemini'}
+              onSelect={() => setProvider('gemini')}
+            />
+          </s-grid>
+        </s-stack>
       </s-section>
 
       {/* Anthropic Claude API key */}
-      <s-section>
-        <s-grid
-          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
-          gap="base"
-        >
-          <s-stack gap="small-200">
-            <s-heading>Anthropic Claude API key</s-heading>
-            <s-text color="subdued">
-              Get your key at{' '}
-              <s-link href="https://console.anthropic.com/" target="_blank">
-                console.anthropic.com
-              </s-link>
-              .
-            </s-text>
-          </s-stack>
-          <s-stack gap="small">
-            <s-stack direction="inline" gap="small" alignItems="end">
-              <s-text-field
-                label="Anthropic Claude API key"
-                labelAccessibilityVisibility="exclusive"
-                readOnly
-                value={claudeRevealed ? claudeApiKey.full : claudeApiKey.masked}
-              />
-              <s-button
-                onClick={() => setClaudeRevealed((v) => !v)}
-                icon={claudeRevealed ? 'hide' : 'view'}
-              >
-                {claudeRevealed ? 'Hide' : 'Reveal'}
-              </s-button>
-            </s-stack>
-          </s-stack>
-        </s-grid>
-      </s-section>
+      <ApiKeyCard
+        provider="Anthropic Claude"
+        helperLinkLabel="console.anthropic.com"
+        helperLinkHref="https://console.anthropic.com/"
+        keyMasked={claudeApiKey.masked}
+        keyFull={claudeApiKey.full}
+        keyLastFour={claudeApiKey.lastFour}
+        revealed={claudeRevealed}
+        onToggleReveal={() => setClaudeRevealed((v) => !v)}
+      />
 
       {/* Google Gemini API key */}
-      <s-section>
-        <s-grid
-          gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
-          gap="base"
-        >
-          <s-stack gap="small-200">
-            <s-heading>Google Gemini API key</s-heading>
-            <s-text color="subdued">
-              Get your key at{' '}
-              <s-link href="https://aistudio.google.com/apikey" target="_blank">
-                aistudio.google.com/apikey
-              </s-link>
-              .
-            </s-text>
-          </s-stack>
-          <s-stack gap="small">
-            <s-stack direction="inline" gap="small" alignItems="end">
-              <s-text-field
-                label="Google Gemini API key"
-                labelAccessibilityVisibility="exclusive"
-                readOnly
-                value={geminiRevealed ? geminiApiKey.full : geminiApiKey.masked}
-              />
-              <s-button
-                onClick={() => setGeminiRevealed((v) => !v)}
-                icon={geminiRevealed ? 'hide' : 'view'}
-              >
-                {geminiRevealed ? 'Hide' : 'Reveal'}
-              </s-button>
-            </s-stack>
-          </s-stack>
-        </s-grid>
-      </s-section>
+      <ApiKeyCard
+        provider="Google Gemini"
+        helperLinkLabel="aistudio.google.com/apikey"
+        helperLinkHref="https://aistudio.google.com/apikey"
+        keyMasked={geminiApiKey.masked}
+        keyFull={geminiApiKey.full}
+        keyLastFour={geminiApiKey.lastFour}
+        revealed={geminiRevealed}
+        onToggleReveal={() => setGeminiRevealed((v) => !v)}
+      />
 
       {/* Action row */}
       <s-stack direction="inline" justifyContent="end" gap="small">
@@ -147,6 +114,120 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
           </s-button>
         </s-button-group>
       </s-stack>
+
+      {/* Footer help */}
+      <s-section>
+        <s-stack direction="inline" gap="small-200" alignItems="center">
+          <s-icon type="question-circle" color="subdued" />
+          <s-text color="subdued">
+            Need help configuring your chat agent? See the{' '}
+            <s-link href="https://shopify.dev/docs/apps" target="_blank">
+              Shopify app documentation
+            </s-link>
+            .
+          </s-text>
+        </s-stack>
+      </s-section>
     </>
+  );
+}
+
+/**
+ * Visual card for a single LLM provider. Whole card is clickable.
+ * Active card gets a subdued background and an "Active" success badge.
+ */
+function ProviderCard({ initials, name, model, description, active, onSelect }) {
+  return (
+    <s-clickable
+      onClick={onSelect}
+      border="base"
+      borderRadius="base"
+      padding="base"
+      background={active ? 'subdued' : 'base'}
+      accessibilityLabel={`Select ${name}`}
+    >
+      <s-stack gap="small">
+        <s-stack
+          direction="inline"
+          gap="small"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-avatar initials={initials} size="base" alt={name} />
+            <s-stack gap="none">
+              <s-text type="strong">{name}</s-text>
+              <s-text color="subdued">{model}</s-text>
+            </s-stack>
+          </s-stack>
+          {active ? (
+            <s-badge tone="success" icon="check-circle">Active</s-badge>
+          ) : (
+            <s-badge tone="info">Available</s-badge>
+          )}
+        </s-stack>
+        <s-text color="subdued">{description}</s-text>
+      </s-stack>
+    </s-clickable>
+  );
+}
+
+/**
+ * A single API-key section: heading + Configured badge + helper text on
+ * the left, masked field + Reveal/Hide button + last-4 hint on the right.
+ */
+function ApiKeyCard({
+  provider,
+  helperLinkLabel,
+  helperLinkHref,
+  keyMasked,
+  keyFull,
+  keyLastFour,
+  revealed,
+  onToggleReveal,
+}) {
+  return (
+    <s-section>
+      <s-grid
+        gridTemplateColumns="@container (inline-size <= 720px) 1fr, 1fr 2fr"
+        gap="base"
+      >
+        <s-stack gap="small-200">
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-heading>{provider} API key</s-heading>
+            <s-badge tone="success" icon="check-circle">Configured</s-badge>
+          </s-stack>
+          <s-text color="subdued">
+            Get your key at{' '}
+            <s-link href={helperLinkHref} target="_blank">
+              {helperLinkLabel}
+            </s-link>
+            .
+          </s-text>
+        </s-stack>
+        <s-stack gap="small-200">
+          <s-stack direction="inline" gap="small" alignItems="end">
+            <s-text-field
+              label={`${provider} API key`}
+              labelAccessibilityVisibility="exclusive"
+              readOnly
+              value={revealed ? keyFull : keyMasked}
+            />
+            <s-button
+              onClick={onToggleReveal}
+              icon={revealed ? 'hide' : 'view'}
+            >
+              {revealed ? 'Hide' : 'Reveal'}
+            </s-button>
+          </s-stack>
+          <s-text color="subdued">
+            Last 4 characters:{' '}
+            <s-text type="strong" fontVariantNumeric="tabular-nums">
+              {keyLastFour}
+            </s-text>
+          </s-text>
+        </s-stack>
+      </s-grid>
+    </s-section>
   );
 }
