@@ -13,6 +13,11 @@
 import { adminGraphQL } from "../admin-graphql.server";
 import { requireCustomer } from "../customer-identity.server";
 import { getOrderCursor, setOrderCursor } from "../../db.server";
+import { mapOrder } from "./orderOps-shape";
+
+// Re-export so callers (tool.server.js, chat.jsx transforms) can keep their
+// existing import path while the pure mapping logic lives elsewhere.
+export { mapOrder };
 
 const PAGE_SIZE = 3;
 
@@ -31,13 +36,33 @@ const LIST_ORDERS_QUERY = /* GraphQL */ `
           id
           name
           processedAt
+          cancelledAt
+          cancelReason
+          statusPageUrl
           displayFinancialStatus
           displayFulfillmentStatus
           currentTotalPriceSet {
             shopMoney { amount currencyCode }
           }
           lineItems(first: 5) {
-            nodes { title quantity }
+            nodes {
+              title
+              quantity
+              image { url altText }
+            }
+          }
+          fulfillments(first: 5) {
+            id
+            status
+            trackingInfo(first: 5) { number url company }
+            fulfillmentLineItems(first: 5) {
+              edges {
+                node {
+                  quantity
+                  lineItem { title }
+                }
+              }
+            }
           }
         }
       }
@@ -80,17 +105,7 @@ export async function listMyOrders(ctx, args = {}) {
     conn.pageInfo?.hasNextPage ? conn.pageInfo.endCursor : null
   );
 
-  const orders = (conn.nodes || []).map((o) => ({
-    id: o.id,
-    name: o.name,
-    processedAt: o.processedAt,
-    financialStatus: o.displayFinancialStatus,
-    fulfillmentStatus: o.displayFulfillmentStatus,
-    total: o.currentTotalPriceSet?.shopMoney
-      ? `${o.currentTotalPriceSet.shopMoney.amount} ${o.currentTotalPriceSet.shopMoney.currencyCode}`
-      : null,
-    lineItems: (o.lineItems?.nodes || []).map((li) => `${li.quantity}× ${li.title}`),
-  }));
+  const orders = (conn.nodes || []).map((o) => mapOrder(o));
 
   return {
     orders,
