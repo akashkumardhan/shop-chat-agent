@@ -4,13 +4,12 @@ import { useState } from 'react';
  * Settings form (mock UI for demo purposes).
  *
  * Layout follows the canonical Shopify settings template:
- *  - Top banner explains the demo nature of the page.
  *  - Provider selection uses two clickable provider cards (more visual
  *    than a radio list — each card shows an avatar, name, description,
  *    and an "Active" badge on the selected option).
  *  - Each API key section is a two-column grid: left column has the
- *    heading + "Configured" status badge + helper link; right column
- *    has the read-only masked field + Reveal/Hide button + last-4 hint.
+ *    heading + helper link; right column has the read-only masked
+ *    field + Reveal/Hide button + last-4 hint.
  *  - Save/Cancel use <s-button-group> aligned to the trailing edge.
  *  - Bottom footer-help section points to documentation.
  *
@@ -40,16 +39,6 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
 
   return (
     <>
-      {/* Demo-mode banner */}
-      <s-banner heading="Demo settings" tone="info">
-        These settings are a UI demonstration. The chat agent's real provider
-        selection and API authentication continue to use the{' '}
-        <s-text type="strong">LLM_PROVIDER</s-text>,{' '}
-        <s-text type="strong">CLAUDE_API_KEY</s-text>, and{' '}
-        <s-text type="strong">GEMINI_API_KEY</s-text> environment variables
-        on the server.
-      </s-banner>
-
       {/* Provider selection */}
       <s-section heading="LLM provider">
         <s-stack gap="base">
@@ -193,10 +182,7 @@ function ApiKeyCard({
         gap="base"
       >
         <s-stack gap="small-200">
-          <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-heading>{provider} API key</s-heading>
-            <s-badge tone="success" icon="check-circle">Configured</s-badge>
-          </s-stack>
+          <s-heading>{provider} API key</s-heading>
           <s-text color="subdued">
             Get your key at{' '}
             <s-link href={helperLinkHref} target="_blank">
