@@ -238,6 +238,18 @@ function init() {
       }
       return;
     }
+    if (ev.type === 'order_results' && Array.isArray(ev.orders) && ev.orders.length > 0) {
+      // Append one order_status block per order. ui-turn.js wires the
+      // ui-order-status renderer; ui-order-status.js reads the rich shape
+      // (fulfillments[], cancelReason, statusUrl, financialStatus).
+      for (const order of ev.orders) {
+        conversation.appendBlock(currentAssistantTurnId, {
+          type: 'order_status',
+          order, // pass the whole mapped order object through
+        });
+      }
+      return;
+    }
     if (ev.type === 'message_complete') return;
     if (ev.type === 'error' && ev.error) {
       conversation.appendBlock(currentAssistantTurnId, { type: 'text', content: `_Error: ${ev.error}_` });

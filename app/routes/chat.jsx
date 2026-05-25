@@ -182,6 +182,7 @@ async function handleChatSession({
     // Prepare conversation state
     let conversationHistory = [];
     let productsToDisplay = [];
+    let ordersToDisplay = [];
 
     // Save user message to the database
     await saveMessage(conversationId, 'user', userMessage);
@@ -271,6 +272,7 @@ async function handleChatSession({
                 toolUseId,
                 conversationHistory,
                 productsToDisplay,
+                ordersToDisplay,
                 conversationId
               );
             }
@@ -300,6 +302,14 @@ async function handleChatSession({
       stream.sendMessage({
         type: 'product_results',
         products: productsToDisplay
+      });
+    }
+
+    // Send order results if list_my_orders was called this turn
+    if (ordersToDisplay.length > 0) {
+      stream.sendMessage({
+        type: 'order_results',
+        orders: ordersToDisplay
       });
     }
   } catch (error) {

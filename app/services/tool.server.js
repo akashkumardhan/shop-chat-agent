@@ -37,15 +37,52 @@ export function createToolService() {
    * @param {string} toolUseId - The ID of the tool use request
    * @param {Array} conversationHistory - The conversation history
    * @param {Array} productsToDisplay - Array to add product results to
+   * @param {Array} ordersToDisplay - Array to add order results to
    * @param {string} conversationId - The conversation ID
    */
-  const handleToolSuccess = async (toolUseResponse, toolName, toolUseId, conversationHistory, productsToDisplay, conversationId) => {
+  const handleToolSuccess = async (
+    toolUseResponse,
+    toolName,
+    toolUseId,
+    conversationHistory,
+    productsToDisplay,
+    ordersToDisplay,
+    conversationId
+  ) => {
     // Check if this is a product search result
     if (toolName === AppConfig.tools.productSearchName) {
       productsToDisplay.push(...processProductSearchResult(toolUseResponse));
     }
 
+    // Check if this is a list_my_orders result — surface the orders so the
+    // client can render them as cards inside the assistant turn.
+    if (toolName === "list_my_orders") {
+      ordersToDisplay.push(...processOrderListResult(toolUseResponse));
+    }
+
     addToolResultToHistory(conversationHistory, toolUseId, toolUseResponse.content, conversationId);
+  };
+
+  /**
+   * Extract the `orders` array from a list_my_orders tool response.
+   * Tolerates either a single text content block with JSON, or a structured
+   * object response.
+   * @param {Object} toolUseResponse
+   * @returns {Array} array of order objects (matching the mapOrder shape)
+   */
+  const processOrderListResult = (toolUseResponse) => {
+    try {
+      if (!toolUseResponse?.content || toolUseResponse.content.length === 0) return [];
+      const raw = toolUseResponse.content[0]?.text;
+      if (!raw) return [];
+
+      const data = typeof raw === "object" ? raw : JSON.parse(raw);
+      if (Array.isArray(data?.orders)) return data.orders;
+      return [];
+    } catch (e) {
+      console.error("[tool] processOrderListResult error:", e.message);
+      return [];
+    }
   };
 
   /**
