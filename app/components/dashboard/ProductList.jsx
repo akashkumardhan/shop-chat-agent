@@ -1,7 +1,8 @@
 /**
- * Compact ranked product list. Rows use <s-clickable> for hover affordance
- * and a chevron, with thin top borders providing row separation. Empty
- * state is a subdued message.
+ * Compact ranked product list. Section uses default padding so the heading
+ * and row content have proper breathing room from the card edges. Rows are
+ * separated by thin top borders (skipped on the first row) and have a
+ * trailing chevron-right for navigation affordance.
  *
  * Used twice on the dashboard:
  *   • Trending searched products (metric: "N searches")
@@ -9,11 +10,9 @@
  */
 export function ProductList({ title, items, metric }) {
   return (
-    <s-section heading={title} padding="none">
+    <s-section heading={title}>
       {!items || items.length === 0 ? (
-        <s-stack padding="base">
-          <s-text color="subdued">No data yet</s-text>
-        </s-stack>
+        <s-text color="subdued">No data yet</s-text>
       ) : (
         <s-stack>
           {items.map((item, idx) => (
@@ -21,12 +20,12 @@ export function ProductList({ title, items, metric }) {
               key={`${title}-${item.rank}`}
               borderStyle={idx === 0 ? 'none' : 'solid none none none'}
               border="base"
-              paddingInline="base"
               paddingBlock="small"
+              borderRadius="none"
             >
               <s-grid
                 gridTemplateColumns="auto 1fr auto auto"
-                gap="small"
+                gap="base"
                 alignItems="center"
               >
                 <s-text color="subdued" fontVariantNumeric="tabular-nums">

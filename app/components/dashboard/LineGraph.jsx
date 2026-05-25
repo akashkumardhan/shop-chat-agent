@@ -27,12 +27,15 @@ function formatSeriesValue(key, value) {
 export function LineGraph({ series }) {
   const [hoverIdx, setHoverIdx] = useState(null);
 
-  const width = 720;
-  const height = 280;
-  const paddingLeft = 56;
-  const paddingRight = 16;
-  const paddingTop = 24;
-  const paddingBottom = 40;
+  // viewBox dimensions — chosen for a wide dashboard chart (~3.75:1).
+  // The SVG fills 100% of its container; the viewBox controls the
+  // aspect ratio the chart maintains as it scales.
+  const width = 1200;
+  const height = 320;
+  const paddingLeft = 64;
+  const paddingRight = 24;
+  const paddingTop = 32;
+  const paddingBottom = 48;
   const plotW = width - paddingLeft - paddingRight;
   const plotH = height - paddingTop - paddingBottom;
 
@@ -45,8 +48,8 @@ export function LineGraph({ series }) {
 
   if (totals === 0) {
     return (
-      <div style={{ overflowX: 'auto' }}>
-        <svg viewBox={`0 0 ${width} ${height}`} width="100%" style={{ maxWidth: width }}>
+      <div style={{ width: '100%' }}>
+        <svg viewBox={`0 0 ${width} ${height}`} width="100%" style={{ display: 'block' }}>
           <text
             x={width / 2}
             y={height / 2}
@@ -98,7 +101,7 @@ export function LineGraph({ series }) {
   const latest = series[series.length - 1];
 
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div style={{ width: '100%' }}>
       {/* Legend with latest-day value next to each label */}
       <div
         style={{
@@ -130,7 +133,7 @@ export function LineGraph({ series }) {
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
-        style={{ maxWidth: width, fontFamily: 'Inter, sans-serif', fontSize: 11 }}
+        style={{ display: 'block', fontFamily: 'Inter, sans-serif', fontSize: 12 }}
         role="img"
         aria-label="Last 14 days — conversations, product views, and revenue trend"
       >

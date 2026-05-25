@@ -15,7 +15,7 @@ export default function Index() {
   const { stats, series, trendingSearched, recentPurchased } = useLoaderData();
 
   return (
-    <s-page heading="Shop chat agent">
+    <s-page heading="Shop chat agent" inlineSize="large">
       {/* Metrics row — canonical metrics-card composition */}
       <StatCardRow stats={stats} />
 
