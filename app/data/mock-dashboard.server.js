@@ -50,7 +50,15 @@ export function getDashboardMockData() {
 export function getSettingsMockData(env = process.env) {
   return {
     activeProvider: env.LLM_PROVIDER === 'claude' ? 'claude' : 'gemini',
-    claudeApiKey: { masked: '••••••••••••••••XK4Q', lastFour: 'XK4Q' },
-    geminiApiKey: { masked: '••••••••••••••••P7Lm', lastFour: 'P7Lm' },
+    claudeApiKey: {
+      masked: '••••••••••••••••XK4Q',
+      full: FULL_DUMMY_CLAUDE,
+      lastFour: 'XK4Q',
+    },
+    geminiApiKey: {
+      masked: '••••••••••••••••P7Lm',
+      full: FULL_DUMMY_GEMINI,
+      lastFour: 'P7Lm',
+    },
   };
 }

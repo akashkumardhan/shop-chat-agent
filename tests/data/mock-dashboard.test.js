@@ -62,6 +62,14 @@ describe('getSettingsMockData', () => {
     expect(data.geminiApiKey.lastFour).toBe('P7Lm');
     expect(data.geminiApiKey.masked.endsWith('P7Lm')).toBe(true);
   });
+
+  it('exposes the full dummy key via loader data (not via import)', () => {
+    const data = getSettingsMockData({});
+    expect(data.claudeApiKey.full).toBe(FULL_DUMMY_CLAUDE);
+    expect(data.claudeApiKey.full.endsWith('XK4Q')).toBe(true);
+    expect(data.geminiApiKey.full).toBe(FULL_DUMMY_GEMINI);
+    expect(data.geminiApiKey.full.endsWith('P7Lm')).toBe(true);
+  });
 });
 
 describe('dummy key constants', () => {

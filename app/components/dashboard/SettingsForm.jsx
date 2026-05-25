@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { FULL_DUMMY_CLAUDE, FULL_DUMMY_GEMINI } from '../../data/mock-dashboard.server';
 
 /**
  * Mock settings form using the canonical Shopify settings template:
@@ -8,6 +7,11 @@ import { FULL_DUMMY_CLAUDE, FULL_DUMMY_GEMINI } from '../../data/mock-dashboard.
  * <s-button-group>. <s-text-field readOnly> is used for the API keys
  * since Reveal is a toggle (full dummy ↔ masked) rather than a true
  * password entry.
+ *
+ * The full dummy key strings are passed in via the `claudeApiKey.full`
+ * and `geminiApiKey.full` fields of the loader data — we do not import
+ * them from the *.server.js file because that would violate React
+ * Router's server-only-module boundary and break client-side rendering.
  */
 export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
   const [provider, setProvider] = useState(activeProvider);
@@ -86,7 +90,7 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
                 label="Anthropic Claude API key"
                 labelAccessibilityVisibility="exclusive"
                 readOnly
-                value={claudeRevealed ? FULL_DUMMY_CLAUDE : claudeApiKey.masked}
+                value={claudeRevealed ? claudeApiKey.full : claudeApiKey.masked}
               />
               <s-button
                 onClick={() => setClaudeRevealed((v) => !v)}
@@ -121,7 +125,7 @@ export function SettingsForm({ activeProvider, claudeApiKey, geminiApiKey }) {
                 label="Google Gemini API key"
                 labelAccessibilityVisibility="exclusive"
                 readOnly
-                value={geminiRevealed ? FULL_DUMMY_GEMINI : geminiApiKey.masked}
+                value={geminiRevealed ? geminiApiKey.full : geminiApiKey.masked}
               />
               <s-button
                 onClick={() => setGeminiRevealed((v) => !v)}
