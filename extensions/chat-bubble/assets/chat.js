@@ -4867,7 +4867,7 @@ ${text2}</tr>
   }
 
   // extensions/chat-bubble/assets/modules/api.js
-  var BASE = window.shopAIChatConfig && window.shopAIChatConfig.apiBase || "https://localhost:3458";
+  var BASE = window.shopAIChatConfig && window.shopAIChatConfig.apiBase || "https://assume-merit-contributor-figure.trycloudflare.com";
   var CHAT_URL = `${BASE}/chat`;
   var WELCOME_URL = `${BASE}/welcome`;
   function streamChat(payload, handlers) {

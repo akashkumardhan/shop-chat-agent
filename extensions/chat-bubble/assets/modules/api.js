@@ -2,7 +2,7 @@
  * api — single source of truth for backend calls.
  */
 
-const BASE = (window.shopAIChatConfig && window.shopAIChatConfig.apiBase) || 'https://localhost:3458';
+const BASE = (window.shopAIChatConfig && window.shopAIChatConfig.apiBase) || 'https://assume-merit-contributor-figure.trycloudflare.com';
 const CHAT_URL = `${BASE}/chat`;
 const WELCOME_URL = `${BASE}/welcome`;
 
