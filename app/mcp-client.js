@@ -196,13 +196,17 @@ class MCPClient {
     const result = await runLocalTool(toolName, ctx, toolArgs);
 
     if (result.error && result.error.type === "auth_required") {
-      // Mirror the customer-MCP auth flow: generate an auth URL the widget can pop open.
+      // The widget renders a Sign-in button from the SSE auth_required event
+      // (which carries the URL). The text below is what Claude sees as the tool
+      // result — instruct it to give a short reply that points at the button,
+      // because Claude tends to paraphrase and drop markdown URLs.
       try {
         const authResponse = await generateAuthUrl(this.conversationId, this.shopId);
         return {
           error: {
             type: "auth_required",
-            data: `You need to authorize the app to access your customer data. [Click here to authorize](${authResponse.url})`,
+            url: authResponse.url,
+            data: "Authentication required. The widget has just rendered a Sign in button below your reply. Tell the user briefly to tap it — do not include any URLs in your response.",
           },
         };
       } catch (e) {
@@ -302,12 +306,12 @@ class MCPClient {
           // Generate auth URL
           const authResponse = await generateAuthUrl(this.conversationId, this.shopId);
 
-          // Instead of retrying, return the auth URL for the front-end
           return {
             error: {
               type: "auth_required",
-              data: `You need to authorize the app to access your customer data. [Click here to authorize](${authResponse.url})`
-            }
+              url: authResponse.url,
+              data: "Authentication required. The widget has just rendered a Sign in button below your reply. Tell the user briefly to tap it — do not include any URLs in your response.",
+            },
           };
         }
 

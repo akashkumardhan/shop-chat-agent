@@ -892,62 +892,6 @@
     }
   });
 
-  // extensions/chat-bubble/assets/modules/ui-auth-prompt.js
-  var ui_auth_prompt_exports = {};
-  __export(ui_auth_prompt_exports, {
-    createAuthPrompt: () => createAuthPrompt
-  });
-  function createAuthPrompt(block2, { onSuccess } = {}) {
-    const node = el("div", { class: "swa-auth" });
-    const title = el("div", { class: "swa-auth-title" }, block2.title || "Sign in to continue");
-    const sub = el("div", { class: "swa-auth-sub" }, block2.subtitle || "Connect your account to see your orders.");
-    const btn = el("button", { class: "swa-auth-button", type: "button" }, "Sign in");
-    btn.addEventListener("click", () => openAuthPopup(block2.authUrl, () => {
-      title.remove();
-      sub.remove();
-      btn.remove();
-      node.appendChild(el("div", { class: "swa-auth-success" }, "\u2713 Connected"));
-      onSuccess && onSuccess();
-    }));
-    node.append(title, sub, btn);
-    return node;
-  }
-  function openAuthPopup(url, onAuthSuccess) {
-    const left = window.screenX + (window.innerWidth - POPUP_WIDTH) / 2;
-    const top = window.screenY + (window.innerHeight - POPUP_HEIGHT) / 2;
-    const popup = window.open(url, "swa-auth", `width=${POPUP_WIDTH},height=${POPUP_HEIGHT},left=${left},top=${top}`);
-    if (!popup) {
-      window.location.href = url;
-      return;
-    }
-    function onMessage(e) {
-      if (e.data && e.data.type === "shop_auth_success") {
-        window.removeEventListener("message", onMessage);
-        onAuthSuccess();
-        try {
-          popup.close();
-        } catch {
-        }
-      }
-    }
-    window.addEventListener("message", onMessage);
-    const poll = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(poll);
-        window.removeEventListener("message", onMessage);
-      }
-    }, 500);
-  }
-  var POPUP_WIDTH, POPUP_HEIGHT;
-  var init_ui_auth_prompt = __esm({
-    "extensions/chat-bubble/assets/modules/ui-auth-prompt.js"() {
-      "use strict";
-      init_dom();
-      POPUP_WIDTH = 480;
-      POPUP_HEIGHT = 640;
-    }
-  });
-
   // extensions/chat-bubble/assets/modules/ui-sizing-widget.js
   var ui_sizing_widget_exports = {};
   __export(ui_sizing_widget_exports, {
@@ -4800,12 +4744,15 @@ ${text2}</tr>
       );
       return slot;
     }
-    if (block2.type === "auth_prompt") {
-      const slot = el("div");
-      Promise.resolve().then(() => (init_ui_auth_prompt(), ui_auth_prompt_exports)).then(
-        ({ createAuthPrompt: createAuthPrompt2 }) => slot.replaceWith(createAuthPrompt2(block2, { onSuccess: ctx.onAuthSuccess }))
-      );
-      return slot;
+    if (block2.type === "auth_button") {
+      const wrap = el("div", { class: "swa-auth" });
+      const sub = el("div", { class: "swa-auth-sub" }, "Sign in to view your orders.");
+      const btn = el("button", { class: "swa-auth-button", type: "button" }, "Sign in");
+      btn.addEventListener("click", () => {
+        window.open(block2.url, "_blank", "noopener,noreferrer");
+      });
+      wrap.append(sub, btn);
+      return wrap;
     }
     if (block2.type === "sizing_widget") {
       const slot = el("div");
@@ -5057,7 +5004,7 @@ ${text2}</tr>
   }
 
   // extensions/chat-bubble/assets/modules/api.js
-  var BASE = window.shopAIChatConfig && window.shopAIChatConfig.apiBase || "https://assume-merit-contributor-figure.trycloudflare.com";
+  var BASE = window.shopAIChatConfig && window.shopAIChatConfig.apiBase || "https://traveller-director-ways-why.trycloudflare.com";
   var CHAT_URL = `${BASE}/chat`;
   var WELCOME_URL = `${BASE}/welcome`;
   function streamChat(payload, handlers) {
@@ -5359,7 +5306,6 @@ ${text2}</tr>
     let conversationId = null;
     let activeStream = null;
     let currentAssistantTurnId = null;
-    let lastSendPayload = null;
     const launcherCtl = createLauncher({ state });
     const window_ = createWindow({ state, launcher: launcherCtl.node });
     const header = createHeader({ state });
@@ -5382,9 +5328,6 @@ ${text2}</tr>
           if (currentAssistantTurnId) {
             conversation.appendBlock(currentAssistantTurnId, { type: "save_cart_card" });
           }
-        },
-        onAuthSuccess: () => {
-          if (lastSendPayload) sendMessage(lastSendPayload);
         },
         onSizingComplete: (answers) => {
           sendMessage({ text: "My sizing: " + Object.entries(answers).map(([k, v]) => `${k}=${v}`).join(", ") });
@@ -5462,7 +5405,6 @@ ${text2}</tr>
     }
     function sendMessage(payload) {
       if (state.get("rateLimitedUntil") > Date.now()) return;
-      lastSendPayload = payload;
       stream.setWelcome(null);
       if (payload.image) {
         conversation.appendUserMessage(payload.text || "(image)");
@@ -5544,6 +5486,10 @@ ${text2}</tr>
             // pass the whole mapped order object through
           });
         }
+        return;
+      }
+      if (ev.type === "auth_required" && ev.url) {
+        conversation.appendBlock(currentAssistantTurnId, { type: "auth_button", url: ev.url });
         return;
       }
       if (ev.type === "message_complete") return;

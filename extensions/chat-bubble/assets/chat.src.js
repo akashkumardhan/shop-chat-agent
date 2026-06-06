@@ -59,7 +59,6 @@ function init() {
   let conversationId = null;
   let activeStream = null;
   let currentAssistantTurnId = null;
-  let lastSendPayload = null;
 
   const launcherCtl = createLauncher({ state });
   const window_ = createWindow({ state, launcher: launcherCtl.node });
@@ -85,9 +84,6 @@ function init() {
         if (currentAssistantTurnId) {
           conversation.appendBlock(currentAssistantTurnId, { type: 'save_cart_card' });
         }
-      },
-      onAuthSuccess: () => {
-        if (lastSendPayload) sendMessage(lastSendPayload);
       },
       onSizingComplete: (answers) => {
         sendMessage({ text: 'My sizing: ' + Object.entries(answers).map(([k, v]) => `${k}=${v}`).join(', ') });
@@ -167,7 +163,6 @@ function init() {
 
   function sendMessage(payload) {
     if (state.get('rateLimitedUntil') > Date.now()) return;
-    lastSendPayload = payload;
     stream.setWelcome(null);
 
     if (payload.image) {
@@ -248,6 +243,10 @@ function init() {
           order, // pass the whole mapped order object through
         });
       }
+      return;
+    }
+    if (ev.type === 'auth_required' && ev.url) {
+      conversation.appendBlock(currentAssistantTurnId, { type: 'auth_button', url: ev.url });
       return;
     }
     if (ev.type === 'message_complete') return;

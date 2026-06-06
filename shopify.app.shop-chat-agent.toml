@@ -2,7 +2,7 @@
 
 client_id = "66f6e80cf9353b43ec15bba861e051d4"
 name = "shop-chat-agent"
-application_url = "https://assume-merit-contributor-figure.trycloudflare.com"
+application_url = "https://traveller-director-ways-why.trycloudflare.com"
 embedded = true
 
 [build]
@@ -31,9 +31,10 @@ api_version = "2026-07"
 #   read_returns                          — read return state on Order.returns
 #   write_returns                         — returnRequest mutation (REQUESTED state)
 scopes = "unauthenticated_read_product_listings,read_orders,write_orders,read_customers,write_customers,read_returns,write_returns"
+use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://assume-merit-contributor-figure.trycloudflare.com/api/auth" ]
+redirect_urls = [ "https://traveller-director-ways-why.trycloudflare.com/api/auth" ]
 
 # Customer Account OAuth (used by the chat widget's customer sign-in flow).
 #
@@ -48,4 +49,4 @@ redirect_urls = [ "https://assume-merit-contributor-figure.trycloudflare.com/api
 #     by default; ngrok with a static domain if you want URL stability).
 #   • Path MUST be `/auth/callback` (mounts at app/routes/auth.callback.jsx).
 [customer_authentication]
-redirect_uris = [ "https://assume-merit-contributor-figure.trycloudflare.com/auth/callback" ]
+redirect_uris = [ "https://traveller-director-ways-why.trycloudflare.com/auth/callback" ]

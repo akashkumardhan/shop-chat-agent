@@ -82,15 +82,30 @@ export async function runLocalTool(name, ctx, args) {
     };
   }
 
-  // Differentiate handled-error from success so we can see failures in logs.
   if (result && result.error) {
-    console.warn(`[local-tool] ${name} → handled error: ${result.error}`);
-  } else {
-    const summary = summariseResult(result);
-    console.log(`[local-tool] ${name} → ok: ${summary}`);
+    const errMsg = typeof result.error === "string" ? result.error : JSON.stringify(result.error);
+    console.warn(`[local-tool] ${name} → handled error: ${errMsg}`);
+
+    // Detect server-side Admin API failures (merchant Session invalid, app
+    // uninstalled, token revoked) and translate them into a clear, unambiguous
+    // signal so Claude doesn't tell the shopper to re-authorize their customer
+    // account — that's the wrong remediation for a merchant-side problem.
+    if (/Admin API HTTP 40[13]|no valid session|reinstall the app/i.test(errMsg)) {
+      return {
+        error: {
+          type: "merchant_admin_unavailable",
+          data:
+            "This feature is temporarily unavailable due to a server-side issue connecting to the store. This is NOT a customer account or sign-in problem — do not ask the shopper to authorize, sign in, or re-authenticate. Apologize and suggest they try again shortly or contact support.",
+        },
+      };
+    }
+
+    return { error: { type: "tool_error", data: errMsg } };
   }
 
-  // Pass through as text content so the existing tool.server.js handler treats it like an MCP response.
+  const summary = summariseResult(result);
+  console.log(`[local-tool] ${name} → ok: ${summary}`);
+
   return {
     content: [
       { type: "text", text: JSON.stringify(result) },

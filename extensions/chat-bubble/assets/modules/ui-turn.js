@@ -80,12 +80,15 @@ function renderBlock(block, role, ctx) {
     );
     return slot;
   }
-  if (block.type === 'auth_prompt') {
-    const slot = el('div');
-    import('./ui-auth-prompt.js').then(({ createAuthPrompt }) =>
-      slot.replaceWith(createAuthPrompt(block, { onSuccess: ctx.onAuthSuccess }))
-    );
-    return slot;
+  if (block.type === 'auth_button') {
+    const wrap = el('div', { class: 'swa-auth' });
+    const sub = el('div', { class: 'swa-auth-sub' }, 'Sign in to view your orders.');
+    const btn = el('button', { class: 'swa-auth-button', type: 'button' }, 'Sign in');
+    btn.addEventListener('click', () => {
+      window.open(block.url, '_blank', 'noopener,noreferrer');
+    });
+    wrap.append(sub, btn);
+    return wrap;
   }
   if (block.type === 'sizing_widget') {
     const slot = el('div');
